@@ -1,15 +1,16 @@
 __VERSION__ = "0.1.0.8"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
+from common.vt import VersionInfo
+vi = VersionInfo()
 """Load TOML preferences with explicit command-line overrides."""
 import argparse
 
-from common.vt import __version_info__
 from core.config import ConfigManager
 from core.runtime import ApplicationSetup
 from core.startup import ensureStartup, startupPaths
 
 
-VERSION = __version_info__.version() if __version_info__.project_info else "0.1.0"
+VERSION = vi.version() if vi.project_info else "0.1.0.1"
 
 
 def load_config(argv=None) -> ApplicationSetup:

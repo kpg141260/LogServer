@@ -1,11 +1,7 @@
-import logging
+__VERSION__ = "0.1.0.6"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 import sys
 from pathlib import Path
-
-from common.vt import VersionInfo
-
-vi = VersionInfo()
-
 
 
 def main(argv=None):

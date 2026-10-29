@@ -1,4 +1,4 @@
-__VERSION__ = "0.1.0.1"
+__VERSION__ = "0.1.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 from datetime import datetime
 import logging
@@ -6,11 +6,12 @@ import queue
 import time
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence
+from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QToolBar, QToolButton, QVBoxLayout, QWidget
 
 from core.app_state_manager import AppStateManager
 from core.config_loader import VERSION
+from core.messages import SEVERITIES
 from core.server import LogServer
 from ui.appearance import applyAppearance
 from ui.log_view import LogView
@@ -61,6 +62,37 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
         for action in (self.start_action, self.stop_action, preferences, clear):
             toolbar.addAction(action)
+        self.filter_button = QToolButton()
+        self.filter_button.setText("Filter")
+        self.filter_button.setAccessibleName("Filter log messages")
+        self.filter_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.filter_menu = QMenu(self.filter_button)
+        self.filter_menu.aboutToShow.connect(self._populateFilters)
+        self.filter_button.setMenu(self.filter_menu)
+        toolbar.addWidget(self.filter_button)
+        self.line_numbers_action = QAction("Line numbers", self)
+        self.line_numbers_action.setCheckable(True)
+        self.line_numbers_action.toggled.connect(self.log.setLineNumbersVisible)
+        toolbar.addAction(self.line_numbers_action)
+        search_controls = QWidget()
+        search_layout = QHBoxLayout(search_controls)
+        search_layout.setContentsMargins(search_layout.spacing(), 0, 0, 0)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search log text")
+        self.search.setAccessibleName("Search log text")
+        self.search.setClearButtonEnabled(True)
+        search_label = QLabel("&Search:")
+        search_label.setBuddy(self.search)
+        self.match_case = QCheckBox("Match case")
+        self.search.textChanged.connect(self._searchChanged)
+        self.match_case.toggled.connect(self._searchChanged)
+        for widget in (search_label, self.search, self.match_case):
+            search_layout.addWidget(widget)
+        self.statusBar().addPermanentWidget(search_controls)
+        find = QAction("Find", self)
+        find.setShortcut(QKeySequence.StandardKey.Find)
+        find.triggered.connect(self._focusSearch)
+        self.addAction(find)
         menu = self.menuBar().addMenu("&File")
         for action in (self.start_action, self.stop_action, preferences, clear, quit_action):
             menu.addAction(action)
@@ -75,6 +107,48 @@ class MainWindow(QMainWindow):
         self._status("Stopped")
         if self.manager.config.general.auto_start:
             QTimer.singleShot(0, self.startServer)
+
+    def _populateFilters(self):
+        for action in self.filter_menu.actions():
+            if action.menu():
+                action.menu().deleteLater()
+        self.filter_menu.clear()
+        values = self.log.filterValues()
+        values["severity"].update(SEVERITIES)
+        values["protocol"].update(("TCP", "UDP", "APP"))
+        for key, label in (("severity", "Severity"), ("ip", "IP"), ("protocol", "Protocol"), ("device", "Device")):
+            menu = self.filter_menu.addMenu(label)
+            group = QActionGroup(menu)
+            selected = self.log.filters[key]
+            if selected is not None:
+                values[key].add(selected)
+            for value in (None, *sorted(values[key])):
+                title = "All" if value is None else value or ("(No device)" if key == "device" else "(Unknown)")
+                action = menu.addAction(title)
+                action.setCheckable(True)
+                action.setChecked(value == selected)
+                group.addAction(action)
+                action.triggered.connect(lambda checked, key=key, value=value: self._setFilter(key, value))
+        self.filter_menu.addSeparator()
+        self.filter_menu.addAction("Reset filters", self._resetFilters)
+
+    def _setFilter(self, key, value):
+        filters = dict(self.log.filters)
+        filters[key] = value
+        self.log.setFilters(**filters)
+        active = sum(value is not None for value in filters.values())
+        self.filter_button.setText(f"Filter ({active})" if active else "Filter")
+
+    def _resetFilters(self):
+        self.log.setFilters()
+        self.filter_button.setText("Filter")
+
+    def _searchChanged(self, *args):
+        self.log.setSearch(self.search.text(), self.match_case.isChecked())
+
+    def _focusSearch(self):
+        self.search.setFocus()
+        self.search.selectAll()
 
     def _status(self, state):
         self.statusBar().showMessage(f"{state} | {self.clients} TCP clients | {self.received} messages received")
@@ -121,7 +195,7 @@ class MainWindow(QMainWindow):
         logger = logging.getLogger("LogServer")
         logger.log(logging.WARNING if level == "WARNING" else logging.ERROR, "%s", text)
         stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
-        self.log.appendMessage(f"{stamp} [server] [APP] {level} - {text}")
+        self.log.appendMessage(f"{stamp} server APP [{level}] - {text}")
         self.error.setText(text)
         self.error.show()
 
@@ -136,7 +210,7 @@ class MainWindow(QMainWindow):
                 break
             if kind == "message":
                 self.received += 1
-                self.log.appendMessage(value.line)
+                self.log.appendMessage(value.line, value)
             elif kind == "clients":
                 self.clients = value
             elif kind == "started":

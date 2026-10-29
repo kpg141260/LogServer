@@ -1,8 +1,16 @@
-__VERSION__ = "0.1.0.4"
+__VERSION__ = "0.1.0.6"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
+
+
+def logColors(dark):
+    return {
+        "ip": "#00b800" if dark else "#006200",
+        "time": "#8441c6" if dark else "#572b82",
+        "number": "#00aaff" if dark else "#004162",
+    }
 
 
 def _refreshPalette(app):
@@ -15,13 +23,13 @@ def _refreshPalette(app):
         mode = "dark" if scheme == Qt.ColorScheme.Dark else "light"
     dark = mode == "dark"
     palette = QPalette(app.style().standardPalette())
-    text, window, base = ("#eeeeee", "#353535", "#1e1e1e") if dark else ("#202020", "#efefef", "#ffffff")
+    text, window, base = ("#eeeeee", "#353535", "#1e1e1e") if dark else ("#202020", "#efefef", "#9d9d9d")
     colors = {
         "Window": window, "WindowText": text, "Base": base,
         "AlternateBase": window, "Text": text, "Button": window,
         "ButtonText": text, "ToolTipBase": base, "ToolTipText": text,
         "Highlight": "#1766bd", "HighlightedText": "#ffffff",
-        "Link": "#83d4ff" if dark else "#005b9a",
+        "Link": "#6277ff" if dark else "#37448f",
     }
     for role, color in colors.items():
         palette.setColor(getattr(QPalette.ColorRole, role), QColor(color))

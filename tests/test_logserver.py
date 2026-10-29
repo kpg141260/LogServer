@@ -8,27 +8,32 @@ import subprocess
 import sys
 import tempfile
 import time
-import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont, QTextCursor
-from PySide6.QtWidgets import QApplication, QDialog, QFontDialog
+from PySide6.QtWidgets import QApplication, QDialog
 
 from common.logger import MessageFileWriter
-from core.app_state_manager import AppStateManager
-from core.config import ApplicationConfig, ConfigManager, validate
+from core.config import ConfigManager, validate
 from core.config_loader import VERSION, load_config
 from core.messages import parseMessage
 from core.runtime import ApplicationSetup
 from core.server import LogServer
-from core.startup import StartupPaths, completeSetup, ensureStartup, firstLaunch, setupConfiguration, setupReason, startupPaths
-from ui.log_view import LogView
+from core.startup import (
+    StartupPaths,
+    completeSetup,
+    ensureStartup,
+    firstLaunch,
+    setupConfiguration,
+    setupReason,
+    startupPaths,
+)
 from ui.appearance import applyAppearance
+from ui.log_view import LogView
 from ui.main_window import MainWindow
 from ui.startup_dialog import StartupDialog
 from ui.wrappers.preferences_wrapper import PreferencesDialog
@@ -228,7 +233,9 @@ class ProjectTest(unittest.TestCase):
                 client.sendto(packet, server.address[:2])
         messages = [self.event("message") for _ in packets]
         self.assertEqual([m.level for m in messages], ["ERROR", "WARNING", "INFO"])
-        self.assertIn('"device": "pico"', messages[1].text)
+        self.assertEqual(messages[1].device, "pico")
+        self.assertEqual(messages[1].text, "temperature high")
+        self.assertIn("|pico|temperature high", messages[1].line)
         self.assertIn("\ufffd", messages[2].text)
 
     def test_both_transports_and_concurrent_clients(self):
@@ -303,8 +310,7 @@ class ProjectTest(unittest.TestCase):
         config = self.configured()
         config.logging.rotate = False
         server = self.start(config)
-        with patch("logging.FileHandler.emit", side_effect=OSError("disk full")):
-            with socket.create_connection(server.address[:2], timeout=2) as client:
+        with patch("logging.FileHandler.emit", side_effect=OSError("disk full")) and socket.create_connection(server.address[:2], timeout=2) as client:
                 client.sendall(b"ERROR important\n")
                 self.assertEqual(self.event("error"), "disk full")
                 server.thread.join(3)
@@ -515,6 +521,24 @@ class ProjectTest(unittest.TestCase):
         message = parseMessage(b"\x1b[31mERROR\x1b[0m\x00 <b>keep literal</b>", ("127.0.0.1", 1), "tcp", "utf-8")
         self.assertEqual(message.text, "ERROR <b>keep literal</b>")
 
+    def test_message_header_brackets_only_severity(self):
+        for address, protocol in (("10.10.0.146", "tcp"), ("::1", "udp")):
+            with self.subTest(address=address, protocol=protocol):
+                message = parseMessage(b"WARNING temperature high\ndetails", (address, 5514), protocol, "utf-8")
+                self.assertEqual(message.line,
+                                 f"{message.received} {address} {protocol.upper()} [WARNING] - ||WARNING temperature high\n    details")
+
+    def test_server_notice_header_brackets_only_severity(self):
+        self.manager.config.general.auto_start = False
+        window = MainWindow(ApplicationSetup(self.manager, self.paths))
+        window._notice("WARNING", "test notice")
+        self.assertTrue(window.log.toPlainText().endswith(" server APP [WARNING] - test notice"))
+        window.log.highlighter.rehighlight()
+        severity = window.log.toPlainText().index("WARNING")
+        self.assertTrue(any(run.start == severity and run.length == len("WARNING") and
+                            run.format.fontWeight() == QFont.Weight.Bold
+                            for run in window.log.document().firstBlock().layout().formats()))
+
     def test_rich_display_literal_html_highlights_sections_and_keywords(self):
         view = LogView()
         settings = self.manager.config.general
@@ -546,6 +570,107 @@ class ProjectTest(unittest.TestCase):
             view.appendMessage("bounded")
         self.assertEqual(view.document().blockCount(), 100)
 
+    def test_display_colors_timestamps_ips_and_numbers_across_themes(self):
+        view = LogView()
+        settings = copy.deepcopy(self.manager.config.general)
+        view.configure(settings)
+        stamp = "2026-10-29T11:59:15.720+08:00"
+        address = "10.10.0.146"
+        text = f"{stamp} {address} TCP [ERROR] 🌡️ 537086736 120 36.192\nvalue=-12.5 sensor120"
+        view.appendMessage(text)
+        cursor = view.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        view.setTextCursor(cursor)
+        try:
+            for mode, time_color, ip_color, number_color in (
+                    ("dark", "#8441c6", "#00b800", "#00aaff"),
+                    ("light", "#572b82", "#006200", "#004162"),
+                    ("dark", "#8441c6", "#00b800", "#00aaff")):
+                with self.subTest(mode=mode):
+                    settings.appearance = mode
+                    applyAppearance(settings)
+                    APP.processEvents()
+                    for token, color in ((stamp, time_color), (address, ip_color),
+                                         ("537086736", number_color), ("120", number_color),
+                                         ("36.192", number_color), ("-12.5", number_color)):
+                        position = len(text[:text.index(token)].encode("utf-16-le")) // 2
+                        block = view.document().findBlock(position)
+                        formats = block.layout().formats()
+                        for offset in range(position - block.position(), position - block.position() + len(token)):
+                            run = next(run for run in formats if run.start <= offset < run.start + run.length)
+                            self.assertEqual(run.format.foreground().color().name(), color, token)
+                    self.assertEqual(view.toPlainText(), text)
+                    self.assertEqual(view.textCursor().selectedText().replace("\u2029", "\n"), text)
+        finally:
+            settings.appearance = "system"
+            applyAppearance(settings)
+
+    def test_display_token_colors_preserve_emphasis_and_identifiers(self):
+        view = LogView()
+        settings = copy.deepcopy(self.manager.config.general)
+        settings.keywords = "120"
+        view.configure(settings)
+        view.appendMessage("🌡️ ^10.10.0.146^ 120 sensor537086736")
+        view.highlighter.rehighlight()
+        formats = view.document().firstBlock().layout().formats()
+        for token in ("^10.10.0.146^", "120"):
+            position = len(view.toPlainText().split(token)[0].encode("utf-16-le")) // 2
+            self.assertTrue(any(run.start == position and run.length == len(token) and
+                                run.format.fontWeight() == QFont.Weight.Bold for run in formats))
+        identifier = len("🌡️ ^10.10.0.146^ 120 ".encode("utf-16-le")) // 2
+        self.assertTrue(any(run.start <= identifier and run.start + run.length >= identifier + len("sensor537086736")
+                            for run in formats))
+
+    def test_display_removes_duplicate_timestamp_and_severity(self):
+        view = LogView()
+        view.configure(self.manager.config.general)
+        stamp = "2026-10-29T10:52:39.749+08:00 10.10.0.146 TCP "
+        cases = (
+            ("INFO", "2026-10-29 04:52:39 [   info  ] as_wifi_watchdog 536966416 has completed [41232 bytes free]",
+             "as_wifi_watchdog 536966416 has completed [41232 bytes free]"),
+            ("WARNING", "2026-10-29T04:52:39.123Z [ warn ] temperature high", "temperature high"),
+            ("INFO", "2026-10-29T04:52:39+08:00 INFO - ready\n    details", "ready\n    details"),
+        )
+        for level, source, body in cases:
+            with self.subTest(source=source):
+                view.clear()
+                view.appendMessage(f"{stamp}[{level}] - {source}")
+                expected = f"{stamp}[{level}] {body}"
+                self.assertEqual(view.toPlainText(), expected)
+                view.highlighter.rehighlight()
+                self.assertTrue(any(run.start == len(stamp) + 1 and run.length == len(level) and
+                                    run.format.fontWeight() == QFont.Weight.Bold
+                                    for run in view.document().firstBlock().layout().formats()))
+
+    def test_display_preserves_messages_without_complete_metadata_prefix(self):
+        view = LogView()
+        stamp = "2026-10-29T10:52:39.749+08:00 10.10.0.146 UDP [INFO] - "
+        for body in ("ordinary message", "[ info ] ready", "2026-10-29 04:52:39 ready",
+                     "payload mentions 2026-10-29 04:52:39 [ info ] ready"):
+            with self.subTest(body=body):
+                view.clear()
+                view.appendMessage(stamp + body)
+                self.assertEqual(view.toPlainText(), stamp + body)
+
+    def test_main_window_normalizes_device_header_only_in_display(self):
+        self.manager.config = self.configured()
+        self.manager.config.general.auto_start = False
+        window = MainWindow(ApplicationSetup(self.manager, self.paths))
+        window.show()
+        window.startServer()
+        pump_until(lambda: window._server_state == "Listening")
+        source = "2026-10-29 04:52:39 [   info  ] as_wifi_watchdog 536966416 has completed [41232 bytes free]"
+        with socket.create_connection(window.server.address[:2], timeout=2) as client:
+            client.sendall((source + "\n").encode())
+        pump_until(lambda: window.received == 1)
+        displayed = window.log.toPlainText()
+        self.assertTrue(displayed.endswith("127.0.0.1 TCP [INFO] ||as_wifi_watchdog 536966416 has completed [41232 bytes free]"))
+        self.assertNotIn("2026-10-29 04:52:39", displayed)
+        stored = (Path(self.manager.config.logging.directory) / "devices.log").read_text()
+        self.assertIn("127.0.0.1 TCP [INFO] - ||" + source, stored)
+        window.close()
+        pump_until(lambda: not window.isVisible())
+
     def test_main_window_socket_to_display_and_file_then_shutdown(self):
         self.manager.config = self.configured("both")
         self.manager.config.general.auto_start = False
@@ -567,6 +692,39 @@ class ProjectTest(unittest.TestCase):
         restored = MainWindow(ApplicationSetup(self.manager, self.paths))
         self.assertEqual(restored.size(), window.size())
         restored.close()
+
+    def test_main_window_filters_live_tcp_udp_without_filtering_files(self):
+        self.manager.config = self.configured("both")
+        self.manager.config.general.auto_start = False
+        window = MainWindow(ApplicationSetup(self.manager, self.paths))
+        window.show()
+        window.startServer()
+        pump_until(lambda: window._server_state == "Listening")
+        window._populateFilters()
+        severity_menu = next(action.menu() for action in window.filter_menu.actions() if action.text() == "Severity")
+        next(action for action in severity_menu.actions() if action.text() == "ERROR").trigger()
+        window.search.setText("target")
+        with socket.create_connection(window.server.address[:2], timeout=2) as client:
+            client.sendall(b'{"level":"INFO","device":"pico","message":"hidden target"}\n')
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
+            client.sendto(b'{"level":"ERROR","dvc":"pump","message":"visible target"}', window.server.address[:2])
+        pump_until(lambda: window.received == 2)
+        blocks = []
+        block = window.log.document().firstBlock()
+        while block.isValid():
+            if block.isVisible():
+                blocks.append(block.text())
+            block = block.next()
+        self.assertIn("visible target", "\n".join(blocks))
+        self.assertNotIn("hidden target", "\n".join(blocks))
+        self.assertEqual(window.log.filterValues()["device"], {"pico", "pump"})
+        stored = (Path(self.manager.config.logging.directory) / "devices.log").read_text()
+        self.assertIn("hidden target", stored)
+        self.assertIn("visible target", stored)
+        window._resetFilters()
+        self.assertTrue(window.log.document().firstBlock().isVisible())
+        window.close()
+        pump_until(lambda: not window.isVisible())
 
     def test_main_window_bind_failure_is_visible(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:

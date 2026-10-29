@@ -1,6 +1,6 @@
 """Plain, JSON and syslog messages normalized for safe display and files."""
 from __future__ import annotations
-__VERSION__ = "0.1.0.1"
+__VERSION__ = "0.1.0.5"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 
 import json
@@ -28,18 +28,19 @@ class LogMessage:
     port: int
     transport: str
     level: str
+    device: str
     text: str
     raw: str
 
     @property
     def line(self) -> str:
-        prefix = f"{self.received} [{self.client}] [{self.transport.upper()}] {self.level} - "
+        prefix = f"{self.received} {self.client} {self.transport.upper()} [{self.level}] - |{self.device}|"
         return prefix + self.text.replace("\n", "\n    ")
 
 
 def parseMessage(payload: bytes, peer: tuple, transport: str, encoding: str) -> LogMessage:
     raw = plainText(payload.decode(encoding, errors="replace").rstrip("\r\n"))
-    text, level = raw, "INFO"
+    text, level, device = raw, "INFO", ""
     priority = PRIORITY.match(raw)
     if priority and int(priority[1]) <= 191:
         level = SEVERITIES[int(priority[1]) % 8]
@@ -52,17 +53,23 @@ def parseMessage(payload: bytes, peer: tuple, transport: str, encoding: str) -> 
             obj = json.loads(raw)
         except (ValueError, RecursionError):
             obj = None
+            
         if isinstance(obj, dict):
             candidate = obj.get("level", obj.get("severity", level))
+            
+            device = obj.get("dvc", obj.get("device", ""))
+            device = " ".join(plainText(device).splitlines()).replace("\t", " ") if isinstance(device, str) else ""
+            
             if isinstance(candidate, str) and LEVEL.fullmatch(candidate):
                 level = candidate.upper()
             message = obj.get("message", obj.get("msg"))
+            
             if isinstance(message, str):
                 text = plainText(message)
-                extra = {key: value for key, value in obj.items()
-                         if key not in ("message", "msg", "level", "severity")}
+                extra = {key: value for key, value in obj.items() if key not in ("message", "msg", "level", "severity", "dvc", "device")}
                 if extra:
                     text += " " + json.dumps(extra, ensure_ascii=False)
+    
     level = {"WARN": "WARNING", "FATAL": "CRITICAL"}.get(level, level)
-    return LogMessage(datetime.now().astimezone().isoformat(timespec="milliseconds"),
-                      peer[0], peer[1], transport, level, text, raw)
+    
+    return LogMessage(datetime.now().astimezone().isoformat(timespec="milliseconds"), peer[0], peer[1], transport, level, device, text, raw)
