@@ -116,6 +116,42 @@ class LogFileTest(unittest.TestCase):
         self.assertFalse(self.window.error.isVisible())
         self.assertEqual(self.window.file_log.toPlainText(), "")
 
+    def test_close_log_file_clears_hides_and_can_reopen(self):
+        window = self.window
+        action = next(action for action in window.menuBar().actions()[0].menu().actions()
+                      if action.text() == "Close log file")
+        self.assertFalse(action.isEnabled())
+        with self.assertLogs("LogServer", level="WARNING"):
+            self.load(self.root / "missing.log")
+        self.assertFalse(action.isEnabled())
+        window.log.appendMessage("INFO socket retained")
+        window.search.setText("socket")
+        path = self.root / "close.log"
+        path.write_text("ERROR file contents", encoding="utf-8")
+        self.load(path)
+        self.assertTrue(action.isEnabled())
+        action.trigger()
+        self.assertFalse(action.isEnabled())
+        self.assertEqual(window.file_log.toPlainText(), "")
+        self.assertTrue(window.file_pane.isHidden())
+        self.assertFalse(window.pane_selector.model().item(1).isEnabled())
+        self.assertIs(window.active_log, window.log)
+        self.assertEqual(window.search.text(), "socket")
+        self.assertEqual(window.log.toPlainText(), "INFO socket retained")
+        self.assertEqual(window.file_label.text(), "Log file: no file loaded")
+        self.assertEqual(window.file_status.text(), "")
+        path.write_text("", encoding="utf-8")
+        self.load(path)
+        self.assertTrue(action.isEnabled())
+        self.assertTrue(window.file_pane.isVisible())
+        window.loadLogFile(path)
+        action.trigger()
+        window._fileLoaded((str(path), [("INFO queued result", {})], 0))
+        pump_until(lambda: window.file_loader is None)
+        self.assertFalse(action.isEnabled())
+        self.assertTrue(window.file_pane.isHidden())
+        self.assertEqual(window.file_log.toPlainText(), "")
+
     def test_file_metadata_coloring_and_continuation_filters(self):
         stamp = "2026-10-29T11:59:15.720+08:00"
         lines = [

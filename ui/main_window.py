@@ -1,4 +1,4 @@
-__VERSION__ = "0.1.0.11"
+__VERSION__ = "0.1.0.14"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
         self.state = AppStateManager(str(setup.paths.state_file))
         self.server = None
         self.file_loader = None
+        self._file_load_cancelled = False
         self._file_error = ""
         self.received = 0
         self.clients = 0
@@ -35,15 +36,18 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"LogServer {VERSION}")
         self.resize(1000, 650)
         self.setMinimumSize(500, 300)
+
         central = QWidget()
         layout = QVBoxLayout(central)
         self.endpoint = QLabel()
         self.endpoint.setWordWrap(True)
         layout.addWidget(self.endpoint)
+
         self.error = QLabel()
         self.error.setWordWrap(True)
         self.error.setAccessibleName("Server error")
         self.error.hide()
+
         layout.addWidget(self.error)
         self.log = LogView()
         self.file_log = LogView()
@@ -55,10 +59,12 @@ class MainWindow(QMainWindow):
         file_layout.setContentsMargins(0, 0, 0, 0)
         self.file_label = QLabel("Log file: no file loaded")
         self.file_status = QLabel()
+
         for label in (self.file_label, self.file_status):
             label.setTextFormat(Qt.TextFormat.PlainText)
             label.setWordWrap(True)
             file_layout.addWidget(label)
+
         self.file_status.hide()
         file_layout.addWidget(self.file_log)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
@@ -86,13 +92,17 @@ class MainWindow(QMainWindow):
         quit_action = QAction("Quit", self)
         quit_action.setShortcut(QKeySequence.StandardKey.Quit)
         quit_action.triggered.connect(self.close)
-        for action in (self.start_action, self.stop_action, preferences, clear):
+        for action in (self.start_action, self.stop_action, clear):
             toolbar.addAction(action)
         self.pane_selector = QComboBox()
         self.pane_selector.setAccessibleName("Controls for pane")
         self.pane_selector.addItems(("Socket display", "Log file"))
         self.pane_selector.model().item(1).setEnabled(False)
         toolbar.addWidget(self.pane_selector)
+        self.line_numbers_action = QAction("Line numbers", self)
+        self.line_numbers_action.setCheckable(True)
+        self.line_numbers_action.toggled.connect(self._lineNumbersChanged)
+        toolbar.addAction(self.line_numbers_action)
         self.filter_button = QToolButton()
         self.filter_button.setText("Filter")
         self.filter_button.setAccessibleName("Filter log messages")
@@ -101,10 +111,6 @@ class MainWindow(QMainWindow):
         self.filter_menu.aboutToShow.connect(self._populateFilters)
         self.filter_button.setMenu(self.filter_menu)
         toolbar.addWidget(self.filter_button)
-        self.line_numbers_action = QAction("Line numbers", self)
-        self.line_numbers_action.setCheckable(True)
-        self.line_numbers_action.toggled.connect(self._lineNumbersChanged)
-        toolbar.addAction(self.line_numbers_action)
         search_controls = QWidget()
         search_layout = QHBoxLayout(search_controls)
         search_layout.setContentsMargins(search_layout.spacing(), 0, 0, 0)
@@ -139,11 +145,16 @@ class MainWindow(QMainWindow):
         find.setShortcut(QKeySequence.StandardKey.Find)
         find.triggered.connect(self._focusSearch)
         self.addAction(find)
+
         menu = self.menuBar().addMenu("&File")
         self.open_log_action = QAction("Open log file...", self)
         self.open_log_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_log_action.triggered.connect(self.openLogFile)
         menu.addAction(self.open_log_action)
+        self.close_log_action = QAction("Close log file", self)
+        self.close_log_action.setEnabled(False)
+        self.close_log_action.triggered.connect(self.closeLogFile)
+        menu.addAction(self.close_log_action)
         for action in (self.start_action, self.stop_action, preferences, clear, quit_action):
             menu.addAction(action)
         self.pane_selector.currentIndexChanged.connect(self._paneChanged)
@@ -250,9 +261,23 @@ class MainWindow(QMainWindow):
             self.loadLogFile(dialog.selectedFiles()[0])
         dialog.deleteLater()
 
+    def closeLogFile(self):
+        self._file_load_cancelled = True
+        if self.file_loader is not None:
+            self.file_loader.requestInterruption()
+        self.pane_selector.setCurrentIndex(0)
+        self.pane_selector.model().item(1).setEnabled(False)
+        self.file_log.clear()
+        self.file_label.setText("Log file: no file loaded")
+        self.file_status.clear()
+        self.file_status.hide()
+        self.file_pane.hide()
+        self.close_log_action.setEnabled(False)
+
     def loadLogFile(self, path):
         if self.file_loader is not None:
             return
+        self._file_load_cancelled = False
         self.file_loader = LogFileLoader(path, self.manager.config.general.max_display_lines, self)
         self.file_loader.loaded.connect(self._fileLoaded)
         self.file_loader.failed.connect(self._fileLoadFailed)
@@ -267,7 +292,7 @@ class MainWindow(QMainWindow):
             self._fileLoadFinished()
 
     def _fileLoaded(self, result):
-        if self._closing:
+        if self._closing or self._file_load_cancelled:
             return
         path, lines, omitted = result
         limit = self.manager.config.general.max_display_lines
@@ -286,11 +311,12 @@ class MainWindow(QMainWindow):
             height = self.splitter.height() // 2
             self.splitter.setSizes([height, height])
         self.pane_selector.model().item(1).setEnabled(True)
+        self.close_log_action.setEnabled(True)
         self.pane_selector.setCurrentIndex(1)
         self.file_log.setFocus()
 
     def _fileLoadFailed(self, error):
-        if self._closing:
+        if self._closing or self._file_load_cancelled:
             return
         path = self.file_loader.path
         logging.getLogger("LogServer").warning("Cannot load log file %s: %s", path, error)
