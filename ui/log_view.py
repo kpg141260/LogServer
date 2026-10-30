@@ -1,30 +1,40 @@
-__VERSION__ = "0.1.0.10"
+__VERSION__ = "0.1.0.18"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 """NetworkMonitor-style severity coloring with keyword and section highlights."""
 import re
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt
+from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPainter, QPalette, QSyntaxHighlighter, QTextBlockUserData, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
-from core.messages import LEVEL
+from core.messages import LEVEL, parseMessage
 from ui.appearance import logColors
 
 
-HEADER = re.compile(r"^\d{4}-\d\d-\d\dT\S+ (?P<ip>\S+) (?P<protocol>TCP|UDP|APP) \[(?P<severity>[A-Z]+)\] (?:- )?")
+HEADER = re.compile(r"^\d{4}-\d\d-\d\dT\S+ \[?(?P<ip>[^\s\]]+)\]? \[?(?P<protocol>TCP|UDP|APP)\]? \[?(?P<severity>[A-Z]+)\]? (?:- )?")
 DEVICE = re.compile(r"\|([^|\n]*)\|")
 TIMESTAMP = r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"
 DEVICE_HEADER = re.compile(
     rf"{TIMESTAMP}[ \t]+"
-    rf"(?:\[[ \t]*{LEVEL.pattern}[ \t]*\]|{LEVEL.pattern})[ \t]*(?:[-:][ \t]*)?", re.I)
+    rf"(?:\[[ \t]*{LEVEL.pattern}[ \t]*\]|{LEVEL.pattern})[ \t]*(?:[-:][ \t]*)?", re.IGNORECASE)
 IP_OCTET = r"(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)"
+PATH = (
+    r'''(?<=["'])(?:[^"'\n]*[\\/][^"'\n]+|[^"'\n]*\.[A-Za-z][\w.-]*)(?=["'])'''
+    r'''|(?<![\w/\\])(?:[A-Za-z]:[\\/]|~?[\\/]|\.{1,2}[\\/]|[\w.-]+[\\/])'''
+    r'''[^\s"'<>|,;!?()\[\]{}]*[^\s"'<>|,;:!?()\[\]{}.]'''
+    r"|(?<![\w.])(?:[\w-]+\.)+[A-Za-z][\w-]*(?![\w.])"
+    r"|(?<![\w.])\.[A-Za-z][\w-]*(?![\w.])"
+)
 TOKENS = re.compile(
     rf"(?P<time>\b{TIMESTAMP}\b)"
     rf"|(?P<ip>(?<![\w.]){IP_OCTET}(?:\.{IP_OCTET}){{3}}(?![\w.]))"
+    rf"|(?P<path>{PATH})"
     r"|(?P<number>(?<![\w.])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?(?![\w.]))")
 SECTION = re.compile(r"\^[^^\n]+\^")
+FILE_HEADER = re.compile(
+    rf"^(?:{TIMESTAMP}[ \t]+)?(?:\[[ \t]*)?(?P<severity>{LEVEL.pattern})[ \t]*\]?(?:[ \t]+|[-:][ \t]*|$)", re.IGNORECASE)
 COLORS = {
-    "light": {"DEBUG": "#2e1b6c", 
+    "light": {"DEBUG": "#363636", 
               "INFO": "#2f5e27", 
               "NOTICE": "#2f5e27",
               "WARNING": "#8a5f15", 
@@ -33,7 +43,7 @@ COLORS = {
               "ALERT": "#a10000", 
               "EMERGENCY": "#a10000", 
               "section": "#193062"},
-    "dark": {"DEBUG": "#5d37da", 
+    "dark": {"DEBUG": "#b0b0b0", 
              "INFO": "#6ddb5a", 
              "NOTICE": "#6ddb5a",
              "WARNING": "#ffb027", 
@@ -45,6 +55,26 @@ COLORS = {
 }
 
 
+def logFields(text, previous=None):
+    fields = dict.fromkeys(("severity", "ip", "protocol", "device"), "")
+    header = HEADER.match(text)
+    if header:
+        fields.update(header.groupdict())
+        device = DEVICE.match(text, header.end())
+        fields["device"] = device[1] if device else ""
+    elif text.startswith(("{", "<")):
+        message = parseMessage(text.encode("utf-8", errors="replace"), ("", 0), "", "utf-8")
+        fields.update(severity=message.level, device=message.device)
+    else:
+        header = FILE_HEADER.match(text)
+        if header:
+            level = header["severity"].upper()
+            fields["severity"] = {"WARN": "WARNING", "FATAL": "CRITICAL"}.get(level, level)
+        elif previous is not None:
+            return previous
+    return fields
+
+
 class LogHighlighter(QSyntaxHighlighter):
     def __init__(self, document, view):
         super().__init__(document)
@@ -54,7 +84,7 @@ class LogHighlighter(QSyntaxHighlighter):
 
     def configure(self, keywords):
         words = [word.strip() for word in keywords.split(",") if word.strip()]
-        self.keywords = re.compile("|".join(re.escape(word) for word in words), re.I) if words else None
+        self.keywords = re.compile("|".join(re.escape(word) for word in words), re.IGNORECASE) if words else None
         self.rehighlight()
 
     def highlightBlock(self, text):
@@ -67,35 +97,49 @@ class LogHighlighter(QSyntaxHighlighter):
 
         dark = self.view.palette().base().color().lightness() < 128
         colors = COLORS["dark" if dark else "light"]
-        header = HEADER.match(text)
+        header = HEADER.match(text) or FILE_HEADER.match(text)
         levels = ("DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL", "ALERT", "EMERGENCY")
-        state = levels.index(header["severity"]) if header and header["severity"] in levels else max(0, self.previousBlockState())
+        data = self.currentBlock().userData()
+        level = header["severity"] if header else data.fields["severity"] if data else ""
+        level = {"WARN": "WARNING", "FATAL": "CRITICAL"}.get(level.upper(), level.upper())
+        state = levels.index(level) if level in levels else max(0, self.previousBlockState())
         self.setCurrentBlockState(state)
         style = QTextCharFormat()
         style.setForeground(QColor(colors[levels[state]]))
         apply(0, len(text), style)
         token_colors = logColors(dark)
+
         for match in TOKENS.finditer(text):
             token_style = QTextCharFormat()
             token_style.setForeground(QColor(token_colors[match.lastgroup]))
             apply(match.start(), match.end(), token_style)
-        if header:
-            emphasis = QTextCharFormat(style)
-            emphasis.setFontWeight(QFont.Weight.Bold)
-            apply(header.start("severity"), header.end("severity"), emphasis)
+
         emphasis = QTextCharFormat()
         emphasis.setForeground(QColor(colors["section"]))
         emphasis.setFontWeight(QFont.Weight.Bold)
+
         for pattern in (self.keywords, SECTION):
             if pattern:
                 for match in pattern.finditer(text):
                     apply(match.start(), match.end(), emphasis)
+
         if self.search:
             for match in self.search.finditer(text):
                 highlight = QTextCharFormat(self.format(offsets[match.start()]))
                 highlight.setBackground(self.view.palette().highlight())
                 highlight.setForeground(self.view.palette().highlightedText())
                 apply(match.start(), match.end(), highlight)
+
+        if header:
+            start, end = header.start("severity"), header.end("severity")
+            label_start = start - int(start > 0 and text[start - 1] == "[")
+            label_end = end + int(end < len(text) and text[end] == "]")
+            for position in range(label_start, label_end):
+                emphasis = QTextCharFormat(self.format(offsets[position]))
+                emphasis.setForeground(style.foreground())
+                if start <= position < end:
+                    emphasis.setFontWeight(QFont.Weight.Bold)
+                apply(position, position + 1, emphasis)
 
 
 class LogBlockData(QTextBlockUserData):
@@ -113,11 +157,15 @@ class LineNumberArea(QWidget):
 
 
 class LogView(QPlainTextEdit):
+    focused = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setAccessibleName("Received log messages")
         self.filters = dict.fromkeys(("severity", "ip", "protocol", "device"))
+        self.search_text = ""
+        self.match_case = False
         self.line_numbers = LineNumberArea(self)
         self.line_numbers.hide()
         self.blockCountChanged.connect(self._updateLineNumberAreaWidth)
@@ -135,11 +183,9 @@ class LogView(QPlainTextEdit):
 
     def appendMessage(self, text, message=None):
         header = HEADER.match(text)
-        fields = dict.fromkeys(self.filters, "")
+        fields = logFields(text)
         if header:
-            fields.update(header.groupdict())
             device = DEVICE.match(text, header.end())
-            fields["device"] = device[1] if device else ""
             body_start = device.end() if device else header.end()
             device_header = DEVICE_HEADER.match(text, body_start)
             if device_header:
@@ -177,6 +223,22 @@ class LogView(QPlainTextEdit):
         self.setTextCursor(selection)
         bar.setValue(bar.maximum() if at_end else old_value)
 
+    def setLines(self, lines):
+        limit = self.document().maximumBlockCount()
+        if limit:
+            lines = lines[-limit:]
+        self.setPlainText("\n".join(text for text, fields in lines))
+        block = self.document().firstBlock()
+        for text, fields in lines:
+            if not block.isValid():
+                break
+            block.setUserData(LogBlockData(fields))
+            self._filterBlock(block)
+            block = block.next()
+        self.document().markContentsDirty(0, self.document().characterCount())
+        self.highlighter.rehighlight()
+        self.moveCursor(QTextCursor.MoveOperation.Start)
+
     def _filterBlock(self, block):
         data = block.userData()
         fields = data.fields if data else {}
@@ -206,8 +268,53 @@ class LogView(QPlainTextEdit):
         return values
 
     def setSearch(self, text, match_case=False):
-        self.highlighter.search = re.compile(re.escape(text), 0 if match_case else re.I) if text else None
+        self.search_text, self.match_case = text, match_case
+        self.highlighter.search = re.compile(re.escape(text), 0 if match_case else re.IGNORECASE) if text else None
         self.highlighter.rehighlight()
+
+    def navigateSearch(self, direction):
+        pattern = self.highlighter.search
+        if pattern is None:
+            return False
+        current = self.textCursor()
+        boundary = current.selectionStart() if direction == "previous" else current.selectionEnd()
+        first = last = target = None
+        block = self.document().firstBlock()
+        while block.isValid():
+            if block.isVisible():
+                text = block.text()
+                offsets = [0]
+                for char in text:
+                    offsets.append(offsets[-1] + (2 if ord(char) > 0xFFFF else 1))
+                for match in pattern.finditer(text):
+                    span = (block.position() + offsets[match.start()], block.position() + offsets[match.end()])
+                    if first is None:
+                        first = span
+                    last = span
+                    if direction == "first" or direction == "next" and span[0] >= boundary:
+                        target = span
+                        break
+                    if direction == "previous" and span[1] <= boundary:
+                        target = span
+            if target is not None and direction in ("first", "next"):
+                break
+            block = block.next()
+        if direction == "last" or direction == "previous" and target is None:
+            target = last
+        elif direction == "next" and target is None:
+            target = first
+        if target is None:
+            return False
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(target[0])
+        cursor.setPosition(target[1], QTextCursor.MoveMode.KeepAnchor)
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
+        return True
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self.focused.emit()
 
     def setLineNumbersVisible(self, visible):
         self.line_numbers.setVisible(visible)

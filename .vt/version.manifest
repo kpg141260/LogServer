@@ -7,7 +7,7 @@
             "major": 0,
             "minor": 1,
             "patch": 0,
-            "build": 9,
+            "build": 18,
             "ctime": "",
             "mtime": "",
             "time": "13-15-32",
@@ -84,11 +84,11 @@
         "mtime": "2026-10-28 12:58:51"
     },
     "core/messages.py": {
-        "build": 4,
-        "hash": "a693788fcdc1aa06208298634b36de0062104dc8c05fc3103b48ac142af96eb5",
+        "build": 7,
+        "hash": "cef618dbc911283e023693f9a1759c00f57830e66e57980dc4c1a6099b9f5f15",
         "has_changes": true,
         "ctime": "2026-10-28 12:18:25",
-        "mtime": "2026-10-29 14:06:39"
+        "mtime": "2026-10-29 15:38:31"
     },
     "core/server.py": {
         "build": 2,
@@ -98,18 +98,18 @@
         "mtime": "2026-10-28 13:07:49"
     },
     "ui/appearance.py": {
-        "build": 6,
-        "hash": "3b634253d5b26a33f58ee8ff7b83bb51e237ad2b87a489eefc906d12734aea5f",
+        "build": 8,
+        "hash": "4a600c478d75cba81db84f2a420d8577a6fb229aa09e6f737cf590cbdf4ddb93",
         "has_changes": true,
         "ctime": "2026-10-28 12:49:13",
-        "mtime": "2026-10-29 13:13:46"
+        "mtime": "2026-10-29 16:58:09"
     },
     "ui/log_view.py": {
-        "build": 8,
-        "hash": "40fc3a7d8b961281e69614fd793a8e662ca8c18667c9d917f8d0ddf694532bd2",
+        "build": 18,
+        "hash": "f470ad21841e2b11b280cf088c03eef1afaa5fc274c7f2809956363920be59e1",
         "has_changes": true,
         "ctime": "2026-10-28 12:49:13",
-        "mtime": "2026-10-29 14:06:39"
+        "mtime": "2026-10-29 17:54:05"
     },
     "ui/startup_dialog.py": {
         "build": 2,
@@ -119,10 +119,17 @@
         "mtime": "2026-10-28 12:55:15"
     },
     "ui/main_window.py": {
-        "build": 4,
-        "hash": "67b882fef81fb10bbc02a944b864cd387791a63f58ac8c4942b01d3fb5ea0439",
+        "build": 11,
+        "hash": "2d4ee1932c2982fb7c53803bc195e2824dec30103dfe449ef1a4abc2d8ce8bc2",
         "has_changes": true,
         "ctime": "2026-10-28 12:50:33",
-        "mtime": "2026-10-29 14:07:22"
+        "mtime": "2026-10-29 16:19:16"
+    },
+    "ui/log_file.py": {
+        "build": 3,
+        "hash": "56677cb24b724278d5f14bef364b3f6cde45024ca558bd8c3b1c620f765602c1",
+        "has_changes": true,
+        "ctime": "2026-10-29 15:51:35",
+        "mtime": "2026-10-29 16:05:11"
     }
 }

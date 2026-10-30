@@ -1,4 +1,4 @@
-__VERSION__ = "0.1.0.6"
+__VERSION__ = "0.1.0.8"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QPalette
@@ -10,6 +10,7 @@ def logColors(dark):
         "ip": "#00b800" if dark else "#006200",
         "time": "#8441c6" if dark else "#572b82",
         "number": "#00aaff" if dark else "#004162",
+        "path": "#00ddff" if dark else "#004550"
     }
 
 
@@ -23,7 +24,7 @@ def _refreshPalette(app):
         mode = "dark" if scheme == Qt.ColorScheme.Dark else "light"
     dark = mode == "dark"
     palette = QPalette(app.style().standardPalette())
-    text, window, base = ("#eeeeee", "#353535", "#1e1e1e") if dark else ("#202020", "#efefef", "#9d9d9d")
+    text, window, base = ("#eeeeee", "#353535", "#313131") if dark else ("#202020", "#efefef", "#d3d3d3")
     colors = {
         "Window": window, "WindowText": text, "Base": base,
         "AlternateBase": window, "Text": text, "Button": window,

@@ -1,6 +1,6 @@
 """Plain, JSON and syslog messages normalized for safe display and files."""
 from __future__ import annotations
-__VERSION__ = "0.1.0.5"
+__VERSION__ = "0.1.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 
 import json
@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
-LEVEL = re.compile(r"\b(CRITICAL|FATAL|ERROR|WARNING|WARN|INFO|DEBUG|NOTICE|ALERT|EMERGENCY)\b", re.I)
+LEVEL = re.compile(r"\b(CRITICAL|FATAL|ERROR|WARNING|WARN|INFO|DEBUG|NOTICE|ALERT|EMERGENCY)\b", re.IGNORECASE)
 PRIORITY = re.compile(r"^<(\d{1,3})>")
 SEVERITIES = ("EMERGENCY", "ALERT", "CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG")
 
@@ -34,7 +34,7 @@ class LogMessage:
 
     @property
     def line(self) -> str:
-        prefix = f"{self.received} {self.client} {self.transport.upper()} [{self.level}] - |{self.device}|"
+        prefix = f"{self.received} {self.client} {self.transport.upper()} [{self.level}] {self.device}"
         return prefix + self.text.replace("\n", "\n    ")
 
 
