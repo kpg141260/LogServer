@@ -173,6 +173,8 @@ class MainWindow(QMainWindow):
             search_layout.addWidget(button)
             self.search_buttons[direction] = button
             
+        self.log_level_label = QLabel()
+        self.statusBar().addPermanentWidget(self.log_level_label)
         self.statusBar().addPermanentWidget(search_controls)
         find = QAction("Find", self)
         find.setShortcut(QKeySequence.StandardKey.Find)
@@ -299,6 +301,7 @@ class MainWindow(QMainWindow):
         for view in (self.log, self.file_log, self.second_file_log):
             view.configure(config.general)
         logging.getLogger("LogServer").setLevel(config.logging.level.upper())
+        self.log_level_label.setText(f"Log level: {config.logging.level.lower()}")
         if self.server is None:
             settings = config.socket
             self.endpoint.setText(f"{settings.protocol.upper()} | {settings.host}:{settings.port}")
