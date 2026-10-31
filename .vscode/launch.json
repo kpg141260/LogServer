@@ -5,7 +5,7 @@
             "name": "Python: Debug LogServer",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/log_server.py",
             "cwd": "${workspaceFolder}",
             "python": "${workspaceFolder}/.venv/bin/python",
             "pythonArgs": ["-Xfrozen_modules=off"],

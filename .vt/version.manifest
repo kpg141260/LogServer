@@ -119,11 +119,11 @@
         "mtime": "2026-10-28 12:55:15"
     },
     "ui/main_window.py": {
-        "build": 11,
-        "hash": "2d4ee1932c2982fb7c53803bc195e2824dec30103dfe449ef1a4abc2d8ce8bc2",
+        "build": 14,
+        "hash": "ebc6ab491bd50d2aa2bba4bf40ffa22653b8637855863112cd1da80add718248",
         "has_changes": true,
         "ctime": "2026-10-28 12:50:33",
-        "mtime": "2026-10-29 16:19:16"
+        "mtime": "2026-10-30 09:43:13"
     },
     "ui/log_file.py": {
         "build": 3,

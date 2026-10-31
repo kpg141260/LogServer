@@ -34,15 +34,15 @@ SECTION = re.compile(r"\^[^^\n]+\^")
 FILE_HEADER = re.compile(
     rf"^(?:{TIMESTAMP}[ \t]+)?(?:\[[ \t]*)?(?P<severity>{LEVEL.pattern})[ \t]*\]?(?:[ \t]+|[-:][ \t]*|$)", re.IGNORECASE)
 COLORS = {
-    "light": {"DEBUG": "#363636", 
-              "INFO": "#2f5e27", 
-              "NOTICE": "#2f5e27",
-              "WARNING": "#8a5f15", 
-              "ERROR": "#5d1b1b", 
-              "CRITICAL": "#a10000",
-              "ALERT": "#a10000", 
-              "EMERGENCY": "#a10000", 
-              "section": "#193062"},
+    "light": {"DEBUG": "#2b2b2b", 
+              "INFO": "#4d983f", 
+              "NOTICE": "#4d983f",
+              "WARNING": "#b57a1c", 
+              "ERROR": "#912a2a", 
+              "CRITICAL": "#be0000",
+              "ALERT": "#be0000", 
+              "EMERGENCY": "#be0000", 
+              "section": "#2b52a8"},
     "dark": {"DEBUG": "#b0b0b0", 
              "INFO": "#6ddb5a", 
              "NOTICE": "#6ddb5a",
@@ -126,8 +126,8 @@ class LogHighlighter(QSyntaxHighlighter):
         if self.search:
             for match in self.search.finditer(text):
                 highlight = QTextCharFormat(self.format(offsets[match.start()]))
-                highlight.setBackground(self.view.palette().highlight())
-                highlight.setForeground(self.view.palette().highlightedText())
+                highlight.setBackground(QColor("#665200" if dark else "#ffe082"))
+                highlight.setForeground(self.view.palette().text())
                 apply(match.start(), match.end(), highlight)
 
         if header:

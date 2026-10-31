@@ -24,7 +24,7 @@ def _refreshPalette(app):
         mode = "dark" if scheme == Qt.ColorScheme.Dark else "light"
     dark = mode == "dark"
     palette = QPalette(app.style().standardPalette())
-    text, window, base = ("#eeeeee", "#353535", "#313131") if dark else ("#202020", "#efefef", "#d3d3d3")
+    text, window, base = ("#eeeeee", "#353535", "#313131") if dark else ("#202020", "#efefef", "#e8e8e8")
     colors = {
         "Window": window, "WindowText": text, "Base": base,
         "AlternateBase": window, "Text": text, "Button": window,

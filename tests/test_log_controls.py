@@ -231,6 +231,44 @@ class LogControlsTest(unittest.TestCase):
                 self.assertFalse(view.navigateSearch(direction))
                 self.assertEqual((view.textCursor().position(), view.textCursor().anchor()), position)
 
+    def test_current_search_match_has_distinct_rendered_color(self):
+        view = self.view()
+        view.resize(400, 100)
+        view.show()
+        settings = self.manager.config.general
+
+        def background_at(position):
+            cursor = QTextCursor(view.document())
+            cursor.setPosition(position)
+            rect = view.cursorRect(cursor)
+            return view.viewport().grab().toImage().pixelColor(rect.left() + 2, rect.top() + 1)
+
+        try:
+            for theme in ("light", "dark"):
+                settings.appearance = theme
+                applyAppearance(settings)
+                view.setPlainText("Alpha alpha")
+                view.setSearch("alpha")
+                for direction, selected, other in (("first", 0, 6), ("next", 6, 0), ("next", 0, 6)):
+                    view.navigateSearch(direction)
+                    for focused in (True, False):
+                        with self.subTest(theme=theme, direction=direction, focused=focused):
+                            if focused:
+                                view.activateWindow()
+                                view.setFocus()
+                            else:
+                                view.clearFocus()
+                            APP.processEvents()
+                            self.assertEqual(view.textCursor().selectionStart(), selected)
+                            self.assertNotEqual(background_at(selected), background_at(other))
+                view.setSearch("")
+                view.moveCursor(QTextCursor.MoveOperation.End)
+                APP.processEvents()
+                self.assertEqual(background_at(0), view.palette().base().color())
+        finally:
+            settings.appearance = "system"
+            applyAppearance(settings)
+
     def test_header_severity_keeps_its_color_over_keywords_and_search(self):
         view = self.view()
         settings = self.manager.config.general
@@ -258,7 +296,8 @@ class LogControlsTest(unittest.TestCase):
                                 if start < position < start + len(level) + 1:
                                     self.assertEqual(run.format.fontWeight(), QFont.Weight.Bold)
                                 if query and text.find(query) <= position < text.find(query) + len(query):
-                                    self.assertEqual(run.format.background().color(), view.palette().highlight().color())
+                                    self.assertEqual(run.format.background().color().name(),
+                                                     "#665200" if mode == "dark" else "#ffe082")
                             if not query:
                                 body = text.rindex(level)
                                 run = next(run for run in formats if run.start <= body < run.start + run.length)
@@ -322,7 +361,8 @@ class LogControlsTest(unittest.TestCase):
                 self.assertEqual(highlights(view), ["searchable"])
                 highlighted = next(run for run in view.document().firstBlock().layout().formats()
                                    if run.format.background().style() != Qt.BrushStyle.NoBrush)
-                self.assertEqual(highlighted.format.background().color(), view.palette().highlight().color())
+                self.assertEqual(highlighted.format.background().color().name(),
+                                 "#665200" if mode == "dark" else "#ffe082")
                 view.grab()
             before = view.lineNumberAreaWidth()
             font = view.font()
