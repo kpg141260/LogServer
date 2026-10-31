@@ -77,7 +77,7 @@ def ensureStartup(paths: StartupPaths, *, force: bool = False) -> None:
         return
     root = Path(__file__).resolve().parents[1]
     command = ([sys.executable] if getattr(sys, "frozen", False)
-               else [sys.executable, str(root / "main.py")])
+               else [sys.executable, str(root / "log_server.py")])
     result = subprocess.run([*command, "--setup", str(paths.data_dir),
                              str(paths.config_dir), str(paths.state_file)], check=False)
     if result.returncode == 2:

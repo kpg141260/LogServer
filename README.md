@@ -7,12 +7,12 @@ Cross-platform Python/PySide6 desktop log receiver for IoT and other devices. Re
 Requires Python 3.11 or newer and PySide6 6.12.0. The existing virtual environment can run the application on this Linux checkout:
 
 ```bash
-.venv/bin/python main.py
+.venv/bin/python log_server.py
 ```
 
-For a new environment, install [requirements.txt](requirements.txt) using `python -m pip install -r requirements.txt`, then run `python main.py`. On Windows, use the Python executable in your environment, for example `.venv\Scripts\python.exe main.py`. Native Windows and macOS execution has not yet been verified.
+For a new environment, install [requirements.txt](requirements.txt) using `python -m pip install -r requirements.txt`, then run `python log_server.py`. On Windows, use the Python executable in your environment, for example `.venv\Scripts\python.exe log_server.py`. Native Windows and macOS execution has not yet been verified.
 
-First launch opens setup before the main window. Choose the received-log folder and use **Socket and other preferences** to configure the listener. Configuration and state locations are shown in setup and are chosen through Qt's operating-system standard paths. Subsequent launches reuse saved preferences and window geometry. `python main.py --install` reopens setup without deleting logs.
+First launch opens setup before the main window. Choose the received-log folder and use **Socket and other preferences** to configure the listener. Configuration and state locations are shown in setup and are chosen through Qt's operating-system standard paths. Subsequent launches reuse saved preferences and window geometry. `python log_server.py --install` reopens setup without deleting logs.
 
 The default listener is TCP on `127.0.0.1:5514`. To receive IPv4 devices on your network, set the bind address to `0.0.0.0` in Preferences and permit the selected port through your firewall. For IPv6, use an explicit address such as `::1` or `::`; IPv6 listeners accept IPv6 clients. Select TCP, UDP, or both on the configured port. Start/Stop controls the listener; socket and file changes apply at the next Start. Appearance, fonts, display limit, and keywords apply immediately.
 
@@ -59,8 +59,8 @@ Per-client file names use a stable hash of the socket IP address; every record i
 ## Command-line overrides
 
 ```bash
-python main.py --help
-python main.py --version
+python log_server.py --help
+python log_server.py --version
 ```
 
 `--host`, `--port`, and `--protocol` override saved socket settings for the current run. Saving Preferences persists the settings shown in the dialog.

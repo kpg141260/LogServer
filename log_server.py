@@ -11,7 +11,7 @@ def main(argv=None):
     QCoreApplication.setOrganizationName("LogServer")
     if argv[:1] == ["--setup"]:
         if len(argv) != 4:
-            raise SystemExit("Usage: main.py --setup DATA_DIR CONFIG_DIR STATE_FILE")
+            raise SystemExit("Usage: log_server.py --setup DATA_DIR CONFIG_DIR STATE_FILE")
         from PySide6.QtWidgets import QApplication, QDialog
 
         from core.startup import StartupPaths

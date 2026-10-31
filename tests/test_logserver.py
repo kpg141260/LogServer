@@ -117,6 +117,18 @@ class ProjectTest(unittest.TestCase):
         self.assertFalse(self.paths.configPath().exists())
         self.assertFalse(self.paths.state_file.exists())
 
+    def test_startup_uses_current_entry_point_and_handles_cancel(self):
+        with patch("core.startup.subprocess.run") as run:
+            run.return_value.returncode = 2
+            with self.assertRaises(SystemExit) as cancelled:
+                ensureStartup(self.paths)
+        self.assertEqual(cancelled.exception.code, 0)
+        run.assert_called_once_with([sys.executable, str(ROOT / "log_server.py"), "--setup",
+                                     str(self.paths.data_dir), str(self.paths.config_dir), str(self.paths.state_file)],
+                                    check=False)
+        self.assertFalse(self.paths.configPath().exists())
+        self.assertFalse(self.paths.state_file.exists())
+
     def test_setup_dialog_saves_and_validates(self):
         dialog = StartupDialog(self.paths)
         dialog.directory.setText("")
@@ -206,7 +218,7 @@ class ProjectTest(unittest.TestCase):
 
     def test_cli_help_and_version_without_gui_or_setup(self):
         for argument, expected in (("--help", "--protocol"), ("--version", f"LogServer {VERSION}")):
-            result = subprocess.run([sys.executable, str(ROOT / "main.py"), argument],
+            result = subprocess.run([sys.executable, str(ROOT / "log_server.py"), argument],
                                     cwd=self.root, text=True, capture_output=True, timeout=5)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(expected, result.stdout)
@@ -235,7 +247,8 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual([m.level for m in messages], ["ERROR", "WARNING", "INFO"])
         self.assertEqual(messages[1].device, "pico")
         self.assertEqual(messages[1].text, "temperature high")
-        self.assertIn("|pico|temperature high", messages[1].line)
+        self.assertEqual(messages[1].line,
+                         f"{messages[1].received} 127.0.0.1 UDP [WARNING] pico temperature high")
         self.assertIn("\ufffd", messages[2].text)
 
     def test_both_transports_and_concurrent_clients(self):
@@ -310,7 +323,7 @@ class ProjectTest(unittest.TestCase):
         config = self.configured()
         config.logging.rotate = False
         server = self.start(config)
-        with patch("logging.FileHandler.emit", side_effect=OSError("disk full")) and socket.create_connection(server.address[:2], timeout=2) as client:
+        with patch("logging.FileHandler.emit", side_effect=OSError("disk full")), socket.create_connection(server.address[:2], timeout=2) as client:
                 client.sendall(b"ERROR important\n")
                 self.assertEqual(self.event("error"), "disk full")
                 server.thread.join(3)
@@ -526,7 +539,7 @@ class ProjectTest(unittest.TestCase):
             with self.subTest(address=address, protocol=protocol):
                 message = parseMessage(b"WARNING temperature high\ndetails", (address, 5514), protocol, "utf-8")
                 self.assertEqual(message.line,
-                                 f"{message.received} {address} {protocol.upper()} [WARNING] - ||WARNING temperature high\n    details")
+                                 f"{message.received} {address} {protocol.upper()} [WARNING] WARNING temperature high\n    details")
 
     def test_server_notice_header_brackets_only_severity(self):
         self.manager.config.general.auto_start = False
@@ -664,10 +677,10 @@ class ProjectTest(unittest.TestCase):
             client.sendall((source + "\n").encode())
         pump_until(lambda: window.received == 1)
         displayed = window.log.toPlainText()
-        self.assertTrue(displayed.endswith("127.0.0.1 TCP [INFO] ||as_wifi_watchdog 536966416 has completed [41232 bytes free]"))
+        self.assertTrue(displayed.endswith("127.0.0.1 TCP [INFO] as_wifi_watchdog 536966416 has completed [41232 bytes free]"))
         self.assertNotIn("2026-10-29 04:52:39", displayed)
         stored = (Path(self.manager.config.logging.directory) / "devices.log").read_text()
-        self.assertIn("127.0.0.1 TCP [INFO] - ||" + source, stored)
+        self.assertIn("127.0.0.1 TCP [INFO] " + source, stored)
         window.close()
         pump_until(lambda: not window.isVisible())
 

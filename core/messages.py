@@ -34,7 +34,8 @@ class LogMessage:
 
     @property
     def line(self) -> str:
-        prefix = f"{self.received} {self.client} {self.transport.upper()} [{self.level}] {self.device}"
+        device = f"{self.device} " if self.device else ""
+        prefix = f"{self.received} {self.client} {self.transport.upper()} [{self.level}] {device}"
         return prefix + self.text.replace("\n", "\n    ")
 
 

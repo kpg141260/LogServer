@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QToolBar
 
 from core.runtime import ApplicationSetup
 from core.startup import StartupPaths, setupConfiguration
@@ -88,8 +88,9 @@ class LogFileTest(unittest.TestCase):
         QTest.mouseClick(window.file_log.viewport(), Qt.MouseButton.LeftButton)
         self.assertIs(window.active_log, window.file_log)
         self.assertEqual(window.search.text(), "alpha")
-        clear = next(action for action in window.menuBar().actions()[0].menu().actions() if action.text() == "Clear display")
-        clear.trigger()
+        toolbar = window.findChild(QToolBar)
+        clear = next(action for action in toolbar.actions() if action.text() == "Clear display")
+        QTest.mouseClick(toolbar.widgetForAction(clear), Qt.MouseButton.LeftButton)
         self.assertEqual(window.file_log.toPlainText(), "")
         self.assertIn("socket arrived", window.log.toPlainText())
         replacement = self.root / "replacement.log"
