@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">LogServer</title>
+  <desc id="description">Incoming network connections collected into a log panel with colored severity indicators.</desc>
+  <defs>
+    <linearGradient id="background" x1="48" y1="24" x2="464" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#233c59"/>
+      <stop offset="1" stop-color="#101d30"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="208" y1="112" x2="408" y2="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#344f6a"/>
+      <stop offset="1" stop-color="#24394f"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#background)"/>
+  <rect x="192" y="112" width="232" height="304" rx="32" fill="#091522" opacity=".3"/>
+  <rect x="192" y="104" width="232" height="304" rx="32" fill="url(#panel)" stroke="#638097" stroke-width="4"/>
+  <path d="M232 168h144M232 224h144M232 280h144M232 336h144" fill="none" stroke="#e9f2f8" stroke-width="16" stroke-linecap="round"/>
+  <path d="M232 168h2" stroke="#5ee0c0" stroke-width="16" stroke-linecap="round"/>
+  <path d="M232 224h2" stroke="#6cc8f5" stroke-width="16" stroke-linecap="round"/>
+  <path d="M232 280h2" stroke="#ffc365" stroke-width="16" stroke-linecap="round"/>
+  <path d="M232 336h2" stroke="#ff8585" stroke-width="16" stroke-linecap="round"/>
+  <path d="M96 168h24a20 20 0 0 1 20 20v136a20 20 0 0 1-20 20H96M96 256h116" fill="none" stroke="#5ee0c0" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m196 236 20 20-20 20" fill="none" stroke="#5ee0c0" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#14283b" stroke="#5ee0c0" stroke-width="10">
+    <circle cx="80" cy="168" r="18"/>
+    <circle cx="80" cy="256" r="18"/>
+    <circle cx="80" cy="344" r="18"/>
+  </g>
+</svg>
