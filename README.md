@@ -26,7 +26,7 @@ The Linux desktop launcher has been tested and works on the current Linux system
 - KDE Frameworks Version: 6.31.0
 It opens LogServer from the Applications menu using the app icon, without a terminal window.
 
-The [launcher file](logserver.desktop) points to this checkout at `/home/peterg/Development/Python/LogServer` and its `.venv/bin/python` interpreter. Before installing on another machine or from another folder, edit its `Exec` and `Icon` paths to match your checkout and Python environment. The environment must have the required dependencies installed.
+The [launcher file](logserver.desktop) points to this checkout at `/home/$USER/Development/Python/LogServer` and its `.venv/bin/python` interpreter. Before installing on another machine or from another folder, edit its `Exec` and `Icon` paths to match your checkout and Python environment. The environment must have the required dependencies installed.
 
 Run these commands from the project folder to install the launcher for your user:
 
