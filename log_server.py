@@ -18,6 +18,7 @@ def main(argv=None):
         from core.startup import StartupPaths
         from ui.startup_dialog import StartupDialog
         app = QApplication([sys.argv[0]])
+        app.setDesktopFileName("logserver")
         app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent / "assets" / "logserver.svg")))
         dialog = StartupDialog(StartupPaths(*(Path(value) for value in argv[1:])))
         return 0 if dialog.exec() == QDialog.DialogCode.Accepted else 2
@@ -29,6 +30,7 @@ def main(argv=None):
     from common.logger import ErrorLogger
     from ui.main_window import MainWindow
     app = QApplication([sys.argv[0]])
+    app.setDesktopFileName("logserver")
     app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent / "assets" / "logserver.svg")))
     try:
         diagnostic = ErrorLogger(setup.config_manager.config, setup.paths.data_dir)
