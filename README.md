@@ -20,7 +20,11 @@ This receiver uses plain sockets without authentication or encryption. Use it on
 
 ## Linux desktop launcher
 
-The Linux desktop launcher has been tested and works on the current Linux system. It opens LogServer from the Applications menu using the app icon, without a terminal window.
+The Linux desktop launcher has been tested and works on the current Linux system: 
+- Linux Kernel Version: 7.2.15-arch1-1 (64-bit)
+- KDE Plasma Version: 6.8.2
+- KDE Frameworks Version: 6.31.0
+It opens LogServer from the Applications menu using the app icon, without a terminal window.
 
 The [launcher file](logserver.desktop) points to this checkout at `/home/peterg/Development/Python/LogServer` and its `.venv/bin/python` interpreter. Before installing on another machine or from another folder, edit its `Exec` and `Icon` paths to match your checkout and Python environment. The environment must have the required dependencies installed.
 
