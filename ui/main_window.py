@@ -6,17 +6,19 @@ import logging
 import queue
 import time
 
-from PySide6.QtCore import QSignalBlocker, QTimer, Qt
+from PySide6.QtCore import QEvent, QSignalBlocker, QTimer, Qt
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPushButton, QSplitter, QStyle, QToolBar, QToolButton, QVBoxLayout, QWidget, QWidgetAction
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QSplitter, QStyle, QTabBar, QTabWidget, QToolBar, QToolButton, QVBoxLayout, QWidget
 
+from common.vt import VersionInfo
 from core.app_state_manager import AppStateManager
 from core.config_loader import VERSION
 from core.messages import SEVERITIES
 from core.server import LogServer
 from ui.appearance import applyAppearance
+from ui.help_dialog import HelpDialog
 from ui.log_file import LogFileLoader, LogFileMerger
-from ui.log_view import LogView
+from ui.log_view import COLORS, LogView
 from ui.wrappers.preferences_wrapper import PreferencesDialog
 
 
@@ -28,12 +30,15 @@ class MainWindow(QMainWindow):
         self.server = None
         self.file_loader = None
         self.merge_worker = None
+        self.help_dialog = None
         self.merge_paths = None
         self._merged_path = None
         self._file_load_cancelled = False
         self._file_error = ""
         self.received = 0
         self.clients = 0
+        self.client_logs = {}
+        self.connected_clients = set()
         self._closing = False
         self._stop_time = None
         self.setWindowTitle(f"LogServer {VERSION}")
@@ -53,6 +58,19 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.error)
         self.log = LogView()
+        self.socket_pane = QWidget()
+        socket_layout = QVBoxLayout(self.socket_pane)
+        socket_layout.setContentsMargins(0, 0, 0, 0)
+        socket_layout.addWidget(QLabel("Socket logs"))
+        self.socket_tabs = QTabWidget()
+        self.socket_tabs.setAccessibleName("Client logs")
+        self.socket_tabs.setTabsClosable(True)
+        self.socket_tabs.setUsesScrollButtons(True)
+        self.socket_tabs.addTab(self.log, "All clients")
+        for side in (QTabBar.ButtonPosition.LeftSide, QTabBar.ButtonPosition.RightSide):
+            self.socket_tabs.tabBar().setTabButton(0, side, None)
+        self.socket_tabs.tabCloseRequested.connect(self._closeClientTab)
+        socket_layout.addWidget(self.socket_tabs)
         self.file_log = LogView()
         self.file_log.setAccessibleName("Opened log file")
         self.file_log.setPlaceholderText("Use File > Open log file... to load a .log file.")
@@ -103,7 +121,7 @@ class MainWindow(QMainWindow):
         file_layout.addWidget(self.merge_button, alignment=Qt.AlignmentFlag.AlignRight)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         self.splitter.setChildrenCollapsible(False)
-        self.splitter.addWidget(self.log)
+        self.splitter.addWidget(self.socket_pane)
         self.splitter.addWidget(file_pane)
         self.splitter.setSizes([300, 250])
         file_pane.hide()
@@ -124,6 +142,7 @@ class MainWindow(QMainWindow):
         preferences.setShortcut(QKeySequence("Ctrl+,"))
         preferences.triggered.connect(self.openPreferences)
         clear = QAction("Clear display", self)
+        self.clear_action = clear
         clear.triggered.connect(lambda: self.active_log.clear())
         quit_action = QAction("Quit", self)
         quit_action.setShortcut(QKeySequence.StandardKey.Quit)
@@ -173,8 +192,14 @@ class MainWindow(QMainWindow):
             search_layout.addWidget(button)
             self.search_buttons[direction] = button
             
+        status_controls = QWidget()
+        status_layout = QHBoxLayout(status_controls)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        self.status_label = QLabel()
         self.log_level_label = QLabel()
-        self.statusBar().addPermanentWidget(self.log_level_label)
+        status_layout.addWidget(self.status_label)
+        status_layout.addWidget(self.log_level_label)
+        self.statusBar().addWidget(status_controls)
         self.statusBar().addPermanentWidget(search_controls)
         find = QAction("Find", self)
         find.setShortcut(QKeySequence.StandardKey.Find)
@@ -198,23 +223,39 @@ class MainWindow(QMainWindow):
             menu.addAction(action)
 
         menu_view = self.menuBar().addMenu("&View")
-        self.pane_selector = QComboBox()
+        self.show_socket_action = QAction("Socket panel", self)
+        self.show_socket_action.setCheckable(True)
+        self.show_socket_action.setChecked(True)
+        self.show_socket_action.toggled.connect(lambda visible: self._setPanelVisible(self.socket_pane, visible))
+        self.show_file_action = QAction("File panel", self)
+        self.show_file_action.setCheckable(True)
+        self.show_file_action.toggled.connect(lambda visible: self._setPanelVisible(self.file_pane, visible))
+        menu_view.addAction(self.show_socket_action)
+        menu_view.addAction(self.show_file_action)
+        menu_view.addSeparator()
+        self.pane_selector = QComboBox(self)
+        self.pane_selector.hide()
         self.pane_selector.setAccessibleName("Controls for pane")
         self.pane_selector.addItems(("Socket display", "Log file"))
         self.pane_selector.model().item(1).setEnabled(False)
-        pane_action = QWidgetAction(menu_view)
-        pane_action.setDefaultWidget(self.pane_selector)
 
         self.line_numbers_action = QAction("Line numbers", self)
         self.line_numbers_action.setCheckable(True)
         self.line_numbers_action.toggled.connect(self._lineNumbersChanged)
 
         # menu_view.addAction(clear)
-        menu_view.addAction(pane_action)
         menu_view.addAction(self.line_numbers_action)
+
+        menu_help = self.menuBar().addMenu("&Help")
+        help_action = menu_help.addAction("Help", self.openHelp)
+        help_action.setShortcut(QKeySequence.StandardKey.HelpContents)
+        about_action = menu_help.addAction("About", self.openAbout)
+        about_action.setMenuRole(QAction.MenuRole.NoRole)
         
         self.pane_selector.currentIndexChanged.connect(self._paneChanged)
-        for index, view in enumerate((self.log, self.file_log, self.second_file_log)):
+        self.socket_tabs.currentChanged.connect(self._socketTabChanged)
+        self.log.focused.connect(lambda: self._socketViewFocused(self.log))
+        for index, view in enumerate((self.file_log, self.second_file_log), start=1):
             view.focused.connect(lambda index=index: self.pane_selector.setCurrentIndex(index))
 
         self.manager.configurationChanged.connect(self._configurationChanged)
@@ -229,6 +270,26 @@ class MainWindow(QMainWindow):
         self._status("Stopped")
         if self.manager.config.general.auto_start:
             QTimer.singleShot(0, self.startServer)
+
+    def openHelp(self):
+        if self.help_dialog is None:
+            self.help_dialog = HelpDialog(Path(__file__).resolve().parent.parent / "assets" / "help.md", self)
+        self.help_dialog.loadHelp()
+        self.help_dialog.show()
+        self.help_dialog.raise_()
+        self.help_dialog.activateWindow()
+
+    def openAbout(self):
+        try:
+            info = VersionInfo()
+            version = info.version() if info.project_info else "unavailable"
+        except (OSError, ValueError, TypeError, AttributeError):
+            logging.getLogger("LogServer").warning("Cannot read application version", exc_info=True)
+            version = "unavailable"
+        QMessageBox.about(self, "About LogServer", f"LogServer {version}\n\n"
+                          "TCP and UDP log receiver with live client tabs, log-file viewing and timestamp-ordered merging.\n\n"
+                          "Built with Python and PySide6.\n\n"
+                          "Copyright (c) 2026 Peter Gossler\nMIT License")
 
     def _populateFilters(self):
         for action in self.filter_menu.actions():
@@ -252,14 +313,22 @@ class MainWindow(QMainWindow):
                 action.setChecked(value == selected)
                 group.addAction(action)
                 action.triggered.connect(lambda checked, key=key, value=value: self._setFilter(key, value))
+        self.filter_menu.addAction("Keyword...", self._keywordFilter)
         self.filter_menu.addSeparator()
         self.filter_menu.addAction("Reset filters", self._resetFilters)
+
+    def _keywordFilter(self):
+        view = self.active_log
+        text, accepted = QInputDialog.getText(self, "Keyword filter", "Keywords (comma-separated, match any):",
+                                             text=view.filters["keywords"] or "")
+        if accepted:
+            self._setFilter("keywords", text.strip() or None)
 
     def _setFilter(self, key, value):
         filters = dict(self.active_log.filters)
         filters[key] = value
         self.active_log.setFilters(**filters)
-        active = sum(value is not None for value in filters.values())
+        active = sum(value is not None for value in self.active_log.filters.values())
         self.filter_button.setText(f"Filter ({active})" if active else "Filter")
 
     def _resetFilters(self):
@@ -272,13 +341,15 @@ class MainWindow(QMainWindow):
 
     def _updateSearchButtons(self):
         for button in self.search_buttons.values():
-            button.setEnabled(bool(self.active_log.search_text))
+            button.setEnabled(self.search.isEnabled() and bool(self.active_log.search_text))
 
     def _lineNumbersChanged(self, visible):
         self.active_log.setLineNumbersVisible(visible)
 
     def _paneChanged(self, index):
-        self.active_log = (self.log, self.file_log, self.second_file_log)[index]
+        if index < 0 or not self.pane_selector.model().item(index).isEnabled():
+            return
+        self.active_log = (self.socket_tabs.currentWidget(), self.file_log, self.second_file_log)[index]
         with QSignalBlocker(self.search), QSignalBlocker(self.match_case), QSignalBlocker(self.line_numbers_action):
             self.search.setText(self.active_log.search_text)
             self.match_case.setChecked(self.active_log.match_case)
@@ -288,20 +359,104 @@ class MainWindow(QMainWindow):
         self._updateSearchButtons()
         self.active_log.setFocus()
 
+    def _setPanelVisible(self, panel, visible):
+        panel.setVisible(visible)
+        socket_visible = not self.socket_pane.isHidden()
+        file_visible = not self.file_pane.isHidden()
+        self.pane_selector.model().item(0).setEnabled(socket_visible)
+        for index in range(1, self.pane_selector.count()):
+            self.pane_selector.model().item(index).setEnabled(file_visible)
+        enabled = socket_visible or file_visible
+        for control in (self.pane_selector, self.filter_button, self.search, self.match_case,
+                        self.line_numbers_action, self.clear_action):
+            control.setEnabled(enabled)
+        index = self.pane_selector.currentIndex()
+        if enabled and not self.pane_selector.model().item(index).isEnabled():
+            self.pane_selector.setCurrentIndex(0 if socket_visible else 1)
+        elif enabled:
+            self._paneChanged(index)
+        self._updateSearchButtons()
+        if socket_visible and file_visible:
+            height = self.splitter.height() // 2
+            self.splitter.setSizes([height, height])
+
+    def _socketTabChanged(self, index):
+        if index >= 0 and not self.socket_pane.isHidden():
+            if self.pane_selector.currentIndex() == 0:
+                self._paneChanged(0)
+            else:
+                self.pane_selector.setCurrentIndex(0)
+
+    def _socketViewFocused(self, view):
+        self.socket_tabs.setCurrentWidget(view)
+        self.pane_selector.setCurrentIndex(0)
+
+    def _clientLog(self, key):
+        if key not in self.client_logs:
+            view = LogView()
+            view.configure(self.manager.config.general)
+            view.focused.connect(lambda: self._socketViewFocused(view))
+            self.client_logs[key] = view
+            self.socket_tabs.addTab(view, "")
+            self._updateClientTab(key)
+        return self.client_logs[key]
+
+    def _updateClientTab(self, key):
+        transport, address, port = key
+        address = f"[{address}]" if ":" in address else address
+        state = "Connected" if key in self.connected_clients else "Disconnected"
+        title = f"{transport.upper()} {address}:{port}"
+        if transport == "tcp":
+            title += f" ({state})"
+        view = self.client_logs[key]
+        view.setAccessibleName(title)
+        self.socket_tabs.setTabText(self.socket_tabs.indexOf(view), title)
+
+    def _clientConnectionChanged(self, peer, connected):
+        key = ("tcp", peer[0], peer[1])
+        if connected:
+            self.connected_clients.add(key)
+            self._clientLog(key)
+        else:
+            self.connected_clients.discard(key)
+        if key in self.client_logs:
+            self._updateClientTab(key)
+
+    def _closeClientTab(self, index):
+        view = self.socket_tabs.widget(index)
+        if view is None or view is self.log:
+            return
+        key = next(key for key, item in self.client_logs.items() if item is view)
+        del self.client_logs[key]
+        self.socket_tabs.removeTab(index)
+        view.deleteLater()
+
     def _focusSearch(self):
         self.search.setFocus()
         self.search.selectAll()
 
     def _status(self, state):
-        self.statusBar().showMessage(f"{state} | {self.clients} TCP clients | {self.received} messages received")
+        self.status_label.setText(f"{state} | {self.clients} TCP clients | {self.received} messages received |")
         self._server_state = state
+
+    def _updateLogLevel(self):
+        level = self.manager.config.logging.level
+        dark = self.palette().base().color().lightness() < 128
+        color = COLORS["dark" if dark else "light"].get(level.upper(), COLORS["dark" if dark else "light"]["DEBUG"])
+        self.log_level_label.setText(level.lower())
+        self.log_level_label.setStyleSheet(f"color: {color};")
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.PaletteChange and hasattr(self, "log_level_label"):
+            self._updateLogLevel()
 
     def _configurationChanged(self, config):
         applyAppearance(config.general)
-        for view in (self.log, self.file_log, self.second_file_log):
+        for view in (self.log, *self.client_logs.values(), self.file_log, self.second_file_log):
             view.configure(config.general)
         logging.getLogger("LogServer").setLevel(config.logging.level.upper())
-        self.log_level_label.setText(f"Log level: {config.logging.level.lower()}")
+        self._updateLogLevel()
         if self.server is None:
             settings = config.socket
             self.endpoint.setText(f"{settings.protocol.upper()} | {settings.host}:{settings.port}")
@@ -327,14 +482,13 @@ class MainWindow(QMainWindow):
             self.file_loader.requestInterruption()
         if self.merge_worker is not None:
             self.merge_worker.requestInterruption()
-        self.pane_selector.setCurrentIndex(0)
         self._leaveMerge()
-        self.pane_selector.model().item(1).setEnabled(False)
         self.file_log.clear()
         self.file_label.setText("Log file: no file loaded")
         self.file_status.clear()
         self.file_status.hide()
-        self.file_pane.hide()
+        self.show_file_action.setChecked(False)
+        self._setPanelVisible(self.file_pane, False)
         self.close_log_action.setEnabled(False)
 
     def loadLogFile(self, path):
@@ -409,9 +563,7 @@ class MainWindow(QMainWindow):
             self.error.hide()
         self._file_error = ""
         if self.file_pane.isHidden():
-            self.file_pane.show()
-            height = self.splitter.height() // 2
-            self.splitter.setSizes([height, height])
+            self.show_file_action.setChecked(True)
         self.pane_selector.model().item(1).setEnabled(True)
         self.close_log_action.setEnabled(True)
         self.pane_selector.setCurrentIndex(1)
@@ -578,6 +730,10 @@ class MainWindow(QMainWindow):
             if kind == "message":
                 self.received += 1
                 self.log.appendMessage(value.line, value)
+                key = (value.transport.lower(), value.client, value.port)
+                self._clientLog(key).appendMessage(value.line, value)
+            elif kind in ("connected", "disconnected"):
+                self._clientConnectionChanged(value, kind == "connected")
             elif kind == "clients":
                 self.clients = value
             elif kind == "started":
@@ -589,6 +745,8 @@ class MainWindow(QMainWindow):
         self._status(self._server_state)
         if not server.thread.is_alive() and server.events.empty():
             self.clients = 0
+            for key in tuple(self.connected_clients):
+                self._clientConnectionChanged(key[1:], False)
             if server.failure and self.error.text() != server.failure:
                 self._notice("ERROR", server.failure)
             self.server = None
@@ -620,5 +778,7 @@ class MainWindow(QMainWindow):
             return
         if self.manager.config.general.persist:
             self.state.saveWindow(self)
+        if self.help_dialog is not None:
+            self.help_dialog.close()
         self.timer.stop()
         event.accept()

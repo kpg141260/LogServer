@@ -125,6 +125,7 @@ class LogServer:
                             conn.close()
                             self._emit("warning", f"Cannot configure client {peer[0]}: {exc}")
                             continue
+                        self._emit("connected", peer)
                         self._emit("clients", len(clients))
                     elif kind == "udp":
                         try:
@@ -202,4 +203,5 @@ class LogServer:
         finally:
             selector.unregister(conn)
             conn.close()
+        self._emit("disconnected", client.peer)
         self._emit("clients", len(clients))

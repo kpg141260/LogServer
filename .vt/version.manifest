@@ -5,9 +5,9 @@
         "hasher": "sha256",
         "build_info": {
             "major": 0,
-            "minor": 1,
+            "minor": 9,
             "patch": 0,
-            "build": 18,
+            "build": 23,
             "ctime": "",
             "mtime": "",
             "time": "13-15-32",
@@ -20,116 +20,132 @@
             "transport": ""
         }
     },
-    "main.py": {
-        "build": 6,
-        "hash": "e1e2c0102af302ca5b19b05f488fa7ccec3d3cb7a79a5cfa0094169fff03ca62",
-        "has_changes": true,
-        "ctime": "2026-10-28 10:01:03",
-        "mtime": "2026-10-28 13:15:31"
-    },
     "common/logger.py": {
-        "build": 3,
+        "build": 23,
         "hash": "df98d112e4decf9546812259ec2fdca12750af4edbfa7b363c81d793cbf0b74f",
         "has_changes": true,
         "ctime": "2026-10-28 10:15:27",
-        "mtime": "2026-10-28 13:07:49"
-    },
-    "common/ansi.py": {
-        "build": 2,
-        "hash": "db5e112c59243774d9cb1963dfe45c792a196ae836f327c5f75531035b42e488",
-        "has_changes": true,
-        "ctime": "2026-10-28 10:16:16",
-        "mtime": "2026-10-28 10:18:33"
+        "mtime": "2026-10-28 13:07:49",
+        "version": "0.1.0.23",
+        "version_frozen": true
     },
     "core/app_state_manager.py": {
-        "build": 3,
+        "build": 23,
         "hash": "082d2748ad58abc1b40a7b549411ffefe9c65867daf62cf9cdcb8cf2205425b3",
         "has_changes": true,
         "ctime": "2026-10-28 10:18:53",
         "mtime": "2026-10-28 12:12:29"
     },
     "core/config_loader.py": {
-        "build": 9,
+        "build": 23,
         "hash": "49d10a221225823658eb63cd5cdf95562d598c67b1aa50b7d90039444631a354",
         "has_changes": true,
         "ctime": "2026-10-28 10:18:53",
         "mtime": "2026-10-28 13:15:09"
     },
     "core/startup.py": {
-        "build": 4,
-        "hash": "cf4a0461f7597d537d0a7ba5b0c00f12bf9095d4fc16d87bd6fe77f8954b0162",
+        "build": 23,
+        "hash": "e7d3ab39ee8aead1eadfbb5596b83515becb1880bd312f757b75930dca299514",
         "has_changes": true,
         "ctime": "2026-10-28 10:18:53",
-        "mtime": "2026-10-28 12:57:07"
+        "mtime": "2026-10-31 10:12:14"
     },
     "core/runtime.py": {
-        "build": 2,
+        "build": 23,
         "hash": "372c99d56edd325ad5c98da1b0c644c8204ed91bf2d54faa04f8225fb868d1b2",
         "has_changes": true,
         "ctime": "2026-10-28 10:20:30",
         "mtime": "2026-10-28 12:12:29"
     },
     "core/config.py": {
-        "build": 9,
+        "build": 23,
         "hash": "272853c5a0205ee2d6bdf3acc6d6f00f5378c9cc3eb81ba11ad80268d5dfaedf",
         "has_changes": true,
         "ctime": "2026-10-28 10:20:54",
         "mtime": "2026-10-28 14:05:18"
     },
     "ui/wrappers/preferences_wrapper.py": {
-        "build": 7,
+        "build": 23,
         "hash": "858c22ddccb3ad5d3425145857146a7cf2911354f60d436bdcbda9673f887aba",
         "has_changes": true,
         "ctime": "2026-10-28 11:42:47",
         "mtime": "2026-10-28 12:58:51"
     },
     "core/messages.py": {
-        "build": 7,
-        "hash": "cef618dbc911283e023693f9a1759c00f57830e66e57980dc4c1a6099b9f5f15",
+        "build": 23,
+        "hash": "14daad758eb0a3d5303cf54d797c7fffc2c401a97eaeb48c840defc57f5f7e73",
         "has_changes": true,
         "ctime": "2026-10-28 12:18:25",
-        "mtime": "2026-10-29 15:38:31"
+        "mtime": "2026-10-31 10:12:14"
     },
     "core/server.py": {
-        "build": 2,
-        "hash": "8e2fdba1e5cc6322282f1ee8c20258c213985956f05915fb47413ec9bb35f008",
+        "build": 23,
+        "hash": "6c5ba135579df05d7b87542be44d00f1d447f95a6b3f98b3141e77eede082d9c",
         "has_changes": true,
         "ctime": "2026-10-28 12:18:25",
-        "mtime": "2026-10-28 13:07:49"
+        "mtime": "2026-11-19 12:34:53"
     },
     "ui/appearance.py": {
-        "build": 8,
-        "hash": "4a600c478d75cba81db84f2a420d8577a6fb229aa09e6f737cf590cbdf4ddb93",
+        "build": 23,
+        "hash": "6b1f7a02fd6d9474a0f4c6c416f2515ebae20697ba3003150acf448725deed27",
         "has_changes": true,
         "ctime": "2026-10-28 12:49:13",
-        "mtime": "2026-10-29 16:58:09"
+        "mtime": "2026-10-31 09:34:35"
     },
     "ui/log_view.py": {
-        "build": 18,
-        "hash": "f470ad21841e2b11b280cf088c03eef1afaa5fc274c7f2809956363920be59e1",
+        "build": 23,
+        "hash": "838d0757e4029772cebb21f102d0b661b40ff32190e95e6bf529887614168dad",
         "has_changes": true,
         "ctime": "2026-10-28 12:49:13",
-        "mtime": "2026-10-29 17:54:05"
+        "mtime": "2026-11-19 13:28:27"
     },
     "ui/startup_dialog.py": {
-        "build": 2,
+        "build": 23,
         "hash": "eadfb72294f53e7d16a3ab837e8cf677c2d3f95bd1bbb6fa3f78a16951fbcd51",
         "has_changes": true,
         "ctime": "2026-10-28 12:50:33",
         "mtime": "2026-10-28 12:55:15"
     },
     "ui/main_window.py": {
-        "build": 14,
-        "hash": "ebc6ab491bd50d2aa2bba4bf40ffa22653b8637855863112cd1da80add718248",
+        "build": 23,
+        "hash": "d86a8cdd8e951a6c72bdf49f5c96c5da4816b7017026ab5877629f3370fa20c5",
         "has_changes": true,
         "ctime": "2026-10-28 12:50:33",
-        "mtime": "2026-10-30 09:43:13"
+        "mtime": "2026-11-19 14:01:52"
     },
     "ui/log_file.py": {
-        "build": 3,
-        "hash": "56677cb24b724278d5f14bef364b3f6cde45024ca558bd8c3b1c620f765602c1",
+        "build": 23,
+        "hash": "1680537eb934fd963697a1bbc74a130e70c7338c609f8fe4e87935f5c6b9be59",
         "has_changes": true,
         "ctime": "2026-10-29 15:51:35",
-        "mtime": "2026-10-29 16:05:11"
+        "mtime": "2026-10-31 09:34:35"
+    },
+    "core/log_merge.py": {
+        "build": 23,
+        "hash": "03c8263a5252fccc4167fe37a4569e23ba12c24691b60c9f4fce1dbe7dacc2bf",
+        "has_changes": true,
+        "ctime": "2026-10-31 09:34:35",
+        "mtime": "2026-10-31 09:34:35"
+    },
+    "log_server.py": {
+        "build": 23,
+        "hash": "2b91e850560e70443ab8af0569102f395aa3a4936a0330c46067fc44e1c34903",
+        "has_changes": true,
+        "ctime": "2026-10-31 10:12:15",
+        "mtime": "2026-11-19 12:14:51"
+    },
+    "ui/log_search.py": {
+        "build": 23,
+        "hash": "8fa171e4abc4672ea242d645a63e08ce2848672b7445a25be673c50041f51450",
+        "has_changes": true,
+        "ctime": "2026-11-19 13:21:40",
+        "mtime": "2026-11-19 13:21:40"
+    },
+    "ui/help_dialog.py": {
+        "build": 23,
+        "hash": "9be961819572dd78baac66997891d93a120876dd457a951e51ef2c17f75fdaf9",
+        "has_changes": true,
+        "ctime": "2026-11-19 14:00:07",
+        "mtime": "2026-11-19 14:00:07"
     }
 }

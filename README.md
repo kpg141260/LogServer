@@ -18,6 +18,21 @@ The default listener is TCP on `127.0.0.1:5514`. To receive IPv4 devices on your
 
 This receiver uses plain sockets without authentication or encryption. Use it on trusted networks; keep it behind a firewall or a protected tunnel for remote devices. UDP delivery is best effort and has no acknowledgement.
 
+## Linux desktop launcher
+
+The Linux desktop launcher has been tested and works on the current Linux system. It opens LogServer from the Applications menu using the app icon, without a terminal window.
+
+The [launcher file](logserver.desktop) points to this checkout at `/home/peterg/Development/Python/LogServer` and its `.venv/bin/python` interpreter. Before installing on another machine or from another folder, edit its `Exec` and `Icon` paths to match your checkout and Python environment. The environment must have the required dependencies installed.
+
+Run these commands from the project folder to install the launcher for your user:
+
+```bash
+mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+install -m 644 logserver.desktop "${XDG_DATA_HOME:-$HOME/.local/share}/applications/logserver.desktop"
+```
+
+Open the Applications menu and search for **LogServer**. If you move the project or its Python environment, update the paths in `logserver.desktop` and repeat the installation commands.
+
 ## Device messages
 
 TCP messages are newline-delimited bytes in the selected encoding, UTF-8 by default. A final unterminated line is received when the client disconnects or the idle timeout expires. UDP uses one datagram per message. Python's pickled `logging.handlers.SocketHandler` format and octet-counted syslog framing are not supported.

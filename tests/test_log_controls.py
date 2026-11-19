@@ -1,20 +1,22 @@
 import json
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QCoreApplication, QEvent, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QTimer, Qt
 from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialogButtonBox, QInputDialog, QMessageBox
 
 from core.messages import parseMessage
 from core.runtime import ApplicationSetup
 from core.startup import StartupPaths, setupConfiguration
 from ui.appearance import applyAppearance, logColors
+from ui.help_dialog import HelpDialog
 from ui.log_view import COLORS, LogView
 from ui.main_window import MainWindow
 
@@ -343,6 +345,172 @@ class LogControlsTest(unittest.TestCase):
         window.log.grab()
         window.line_numbers_action.trigger()
         self.assertEqual(window.log.lineNumberAreaWidth(), 0)
+
+    def test_status_and_colored_level_share_left_status_group(self):
+        window = self.window()
+        self.assertIs(window.status_label.parentWidget(), window.log_level_label.parentWidget())
+        for theme in ("light", "dark"):
+            for level in ("debug", "info", "warning", "error", "critical"):
+                with self.subTest(theme=theme, level=level):
+                    self.manager.config.general.appearance = theme
+                    self.manager.config.logging.level = level
+                    window._configurationChanged(self.manager.config)
+                    window.clients, window.received = 2, 42
+                    window._status("Listening")
+                    APP.processEvents()
+                    self.assertEqual(window.log_level_label.text(), level)
+                    self.assertEqual(window.log_level_label.palette().windowText().color().name(),
+                                     COLORS[theme][level.upper()])
+                    self.assertEqual(window.status_label.text(), "Listening | 2 TCP clients | 42 messages received |")
+                    self.assertLess(window.status_label.mapTo(window, window.status_label.rect().topLeft()).x(),
+                                    window.search.mapTo(window, window.search.rect().topLeft()).x())
+
+    def test_help_menu_opens_reusable_nonmodal_guide_and_closes_it(self):
+        window = self.window()
+        menu = next(action.menu() for action in window.menuBar().actions() if action.text() == "&Help")
+        self.assertEqual([action.text() for action in menu.actions()], ["Help", "About"])
+        menu.actions()[0].trigger()
+        dialog = window.help_dialog
+        self.assertTrue(dialog.isVisible())
+        self.assertFalse(dialog.isModal())
+        text = dialog.browser.toPlainText()
+        for heading in ("LogServer help", "Search", "Filter messages", "Merge two log files"):
+            self.assertIn(heading, text)
+        window.search.setText("still usable")
+        self.assertEqual(window.log.search_text, "still usable")
+        buttons = dialog.findChild(QDialogButtonBox)
+        QTest.mouseClick(buttons.button(QDialogButtonBox.StandardButton.Close), Qt.MouseButton.LeftButton)
+        self.assertFalse(dialog.isVisible())
+        menu.actions()[0].trigger()
+        self.assertIs(window.help_dialog, dialog)
+        self.assertTrue(dialog.isVisible())
+        window.close()
+        APP.processEvents()
+        self.assertFalse(dialog.isVisible())
+
+    def test_help_reports_missing_and_invalid_files_and_can_reload(self):
+        path = self.paths.state_file.parent / "help.md"
+        dialog = HelpDialog(path)
+        self.views.append(dialog)
+        for contents in (None, b"\xff\xfe"):
+            with self.subTest(contents=contents):
+                if contents is not None:
+                    path.write_bytes(contents)
+                with self.assertLogs("LogServer", level="WARNING"):
+                    dialog.loadHelp()
+                self.assertIn("Cannot read the help file", dialog.browser.toPlainText())
+        path.write_text("# Test guide\n\nRecovered help content.", encoding="utf-8")
+        dialog.loadHelp()
+        self.assertEqual(dialog.browser.toPlainText(), "Test guide\nRecovered help content.")
+
+    def test_about_menu_displays_manifest_version(self):
+        window = self.window()
+        manifest = Path(__file__).resolve().parent.parent / ".vt" / "version.manifest"
+        build = json.loads(manifest.read_text(encoding="utf-8"))["project"]["build_info"]
+        expected = ".".join(str(build[key]) for key in ("major", "minor", "patch", "build"))
+        observed = []
+
+        def close_about():
+            dialog = APP.activeModalWidget()
+            if dialog is not None:
+                observed.append((isinstance(dialog, QMessageBox), dialog.windowTitle(), dialog.text()))
+                dialog.accept()
+
+        menu = next(action.menu() for action in window.menuBar().actions() if action.text() == "&Help")
+        for _ in range(2):
+            QTimer.singleShot(0, close_about)
+            menu.actions()[1].trigger()
+        self.assertEqual(len(observed), 2)
+        for is_message_box, title, text in observed:
+            self.assertTrue(is_message_box)
+            self.assertEqual(title, "About LogServer")
+            self.assertIn(f"LogServer {expected}", text)
+            self.assertIn("Peter Gossler", text)
+            self.assertIn("MIT License", text)
+
+    def test_keyword_dialog_combines_literal_keywords_with_filters_and_reset(self):
+        window = self.window()
+        self.append(window.log, "Alpha sensor", severity="ERROR")
+        self.append(window.log, "literal [a.b]", severity="ERROR")
+        self.append(window.log, "aXb", severity="ERROR")
+        self.append(window.log, "alpha ignored", severity="INFO")
+        window._setFilter("severity", "ERROR")
+        window._populateFilters()
+
+        def fill_dialog():
+            dialog = APP.activeModalWidget()
+            self.assertIsInstance(dialog, QInputDialog)
+            dialog.setTextValue("ALPHA, [a.b]")
+            dialog.accept()
+
+        QTimer.singleShot(0, fill_dialog)
+        next(action for action in window.filter_menu.actions() if action.text() == "Keyword...").trigger()
+        text = visible_text(window.log)
+        self.assertIn("Alpha sensor", text)
+        self.assertIn("literal [a.b]", text)
+        self.assertNotIn("aXb", text)
+        self.assertNotIn("alpha ignored", text)
+        self.assertEqual(window.filter_button.text(), "Filter (2)")
+        self.append(window.log, "new ALPHA", severity="ERROR")
+        self.assertIn("new ALPHA", visible_text(window.log))
+        window.show_file_action.setChecked(True)
+        window.pane_selector.setCurrentIndex(1)
+        self.assertIsNone(window.active_log.filters["keywords"])
+        window.pane_selector.setCurrentIndex(0)
+        self.assertEqual(window.active_log.filters["keywords"], "ALPHA, [a.b]")
+        window._resetFilters()
+        self.assertIn("aXb", visible_text(window.log))
+        self.assertIn("alpha ignored", visible_text(window.log))
+        self.assertTrue(all(value is None for value in window.log.filters.values()))
+        window._setFilter("keywords", " , , ")
+        self.assertIsNone(window.log.filters["keywords"])
+        self.assertEqual(window.filter_button.text(), "Filter")
+
+    def test_large_file_search_yields_and_keeps_latest_query_and_unicode_navigation(self):
+        from test_log_file import pump_until
+
+        def wait_for_search(predicate):
+            deadline = time.monotonic() + 3
+            while not predicate() and time.monotonic() < deadline:
+                QTest.qWait(1)
+            self.assertTrue(predicate(), "Search did not finish")
+
+        self.manager.config.general.max_display_lines = 12000
+        window = self.window()
+        path = self.paths.state_file.parent / "large.log"
+        path.write_text("\n".join(f"INFO 🌡️ row {index} Alpha alpha" for index in range(12000)), encoding="utf-8")
+        window.loadLogFile(path)
+        pump_until(lambda: window.file_loader is None)
+        view = window.file_log
+        view.setSearch("absent")
+        view.setSearch("Alpha", True)
+        self.assertTrue(view._highlight_timer.isActive())
+        heartbeat = []
+        QTimer.singleShot(0, lambda: heartbeat.append(view._highlight_timer.isActive()))
+        QTest.keyClicks(window.search, "alpha")
+        self.assertEqual(view.search_text, "alpha")
+        pump_until(lambda: bool(heartbeat))
+        self.assertEqual(heartbeat, [True])
+        wait_for_search(lambda: view._search_matches is not None and not view._highlight_timer.isActive())
+        self.assertTrue(view.navigateSearch("first"))
+        self.assertEqual(view.textCursor().selectedText(), "Alpha")
+        self.assertTrue(view.navigateSearch("previous"))
+        self.assertIn("row 11999", view.textCursor().block().text())
+        self.assertEqual(view.textCursor().selectedText(), "alpha")
+        view.setFilters(keywords="row 11000")
+        self.assertTrue(view.navigateSearch("first"))
+        self.assertIn("row 11000", view.textCursor().block().text())
+        view.setFilters()
+        view.appendMessage("INFO 🌡️ newest alpha")
+        view.navigateSearch("last")
+        wait_for_search(lambda: view._search_matches is not None)
+        self.assertEqual(view.textCursor().selectedText(), "alpha")
+        self.assertIn("newest", view.textCursor().block().text())
+        view.setSearch("missing")
+        view.setSearch("")
+        wait_for_search(lambda: not view._highlight_timer.isActive())
+        self.assertFalse(view.navigateSearch("first"))
+        self.assertEqual(highlights(view), [])
 
     def test_search_and_gutter_follow_appearance_and_font_changes(self):
         view = self.view()

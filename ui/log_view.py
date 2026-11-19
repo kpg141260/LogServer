@@ -2,13 +2,17 @@ __VERSION__ = "0.1.0.18"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 """NetworkMonitor-style severity coloring with keyword and section highlights."""
 import re
+import time
+from bisect import bisect_left
+from itertools import chain
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QRect, QSize, Qt, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPainter, QPalette, QSyntaxHighlighter, QTextBlockUserData, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
 from core.messages import LEVEL, parseMessage
 from ui.appearance import logColors
+from ui.log_search import SearchWorker
 
 
 HEADER = re.compile(r"^\d{4}-\d\d-\d\dT\S+ \[?(?P<ip>[^\s\]]+)\]? \[?(?P<protocol>TCP|UDP|APP)\]? \[?(?P<severity>[A-Z]+)\]? (?:- )?")
@@ -163,14 +167,28 @@ class LogView(QPlainTextEdit):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setAccessibleName("Received log messages")
-        self.filters = dict.fromkeys(("severity", "ip", "protocol", "device"))
+        self.filters = dict.fromkeys(("severity", "ip", "protocol", "device", "keywords"))
+        self._keyword_pattern = None
         self.search_text = ""
         self.match_case = False
+        self._search_generation = 0
+        self._search_worker = None
+        self._search_matches = None
+        self._pending_navigation = None
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(120)
+        self._search_timer.timeout.connect(self._startSearch)
+        self._highlight_timer = QTimer(self)
+        self._highlight_timer.setSingleShot(True)
+        self._highlight_timer.timeout.connect(self._highlightSearchBatch)
+        self._highlight_block = None
         self.line_numbers = LineNumberArea(self)
         self.line_numbers.hide()
         self.blockCountChanged.connect(self._updateLineNumberAreaWidth)
         self.updateRequest.connect(self._updateLineNumberArea)
         self.highlighter = LogHighlighter(self.document(), self)
+        self.document().contentsChange.connect(self._searchContentsChanged)
 
     def configure(self, settings):
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
@@ -242,12 +260,17 @@ class LogView(QPlainTextEdit):
     def _filterBlock(self, block):
         data = block.userData()
         fields = data.fields if data else {}
-        visible = all(value is None or fields.get(key) == value for key, value in self.filters.items())
+        visible = all(value is None or fields.get(key) == value for key, value in self.filters.items() if key != "keywords")
+        if visible and self._keyword_pattern:
+            visible = self._keyword_pattern.search(block.text()) is not None
         block.setVisible(visible)
         block.setLineCount(max(1, block.layout().lineCount()) if visible else 0)
 
-    def setFilters(self, severity=None, ip=None, protocol=None, device=None):
-        self.filters = {"severity": severity, "ip": ip, "protocol": protocol, "device": device}
+    def setFilters(self, severity=None, ip=None, protocol=None, device=None, keywords=None):
+        words = [word.strip() for word in (keywords or "").split(",") if word.strip()]
+        self._keyword_pattern = re.compile("|".join(re.escape(word) for word in words), re.IGNORECASE) if words else None
+        self.filters = {"severity": severity, "ip": ip, "protocol": protocol, "device": device,
+                        "keywords": keywords if words else None}
         block = self.document().firstBlock()
         while block.isValid():
             self._filterBlock(block)
@@ -270,12 +293,68 @@ class LogView(QPlainTextEdit):
     def setSearch(self, text, match_case=False):
         self.search_text, self.match_case = text, match_case
         self.highlighter.search = re.compile(re.escape(text), 0 if match_case else re.IGNORECASE) if text else None
-        self.highlighter.rehighlight()
+        self._pending_navigation = None
+        self._invalidateSearch()
+        self._highlight_block = self.document().firstBlock()
+        self._highlightSearchBatch()
+
+    def _invalidateSearch(self, delay=120):
+        self._search_generation += 1
+        self._search_matches = None
+        if self._search_worker is not None:
+            self._search_worker.cancelled.set()
+            self._search_worker = None
+        self._search_timer.stop()
+        if self.search_text and self.blockCount() > 500:
+            self._search_timer.start(delay)
+
+    def _searchContentsChanged(self, position, removed, added):
+        if removed or added:
+            self._invalidateSearch(0)
+
+    def _highlightSearchBatch(self):
+        self._highlight_timer.stop()
+        deadline = time.monotonic() + 0.004
+        block = self._highlight_block
+        cursor = QTextCursor(self.document())
+        cursor.beginEditBlock()
+        try:
+            while block is not None and block.isValid():
+                self.highlighter.rehighlightBlock(block)
+                block = block.next()
+                if time.monotonic() >= deadline:
+                    break
+        finally:
+            cursor.endEditBlock()
+        self._highlight_block = block
+        if block is not None and block.isValid():
+            self._highlight_timer.start(0)
+
+    def _startSearch(self):
+        if not self.highlighter.search:
+            return
+        worker = SearchWorker(self._search_generation, self.toPlainText(), self.highlighter.search)
+        worker.signals.finished.connect(self._searchFinished)
+        self._search_worker = worker
+        QThreadPool.globalInstance().start(worker)
+
+    @Slot(int, object)
+    def _searchFinished(self, generation, matches):
+        if generation != self._search_generation:
+            return
+        self._search_worker = None
+        self._search_matches = matches if matches is not None else []
+        if self._pending_navigation is not None:
+            direction = self._pending_navigation
+            self._pending_navigation = None
+            self.navigateSearch(direction)
 
     def navigateSearch(self, direction):
         pattern = self.highlighter.search
         if pattern is None:
             return False
+        if self.blockCount() > 500:
+            return self._navigateIndexedSearch(direction)
         current = self.textCursor()
         boundary = current.selectionStart() if direction == "previous" else current.selectionEnd()
         first = last = target = None
@@ -311,6 +390,37 @@ class LogView(QPlainTextEdit):
         self.setTextCursor(cursor)
         self.ensureCursorVisible()
         return True
+
+    def _navigateIndexedSearch(self, direction):
+        matches = self._search_matches
+        if matches is None:
+            self._pending_navigation = direction
+            return False
+        current = self.textCursor()
+        boundary = current.selectionStart() if direction == "previous" else current.selectionEnd()
+        if direction == "first":
+            indices = range(len(matches))
+        elif direction == "last":
+            indices = range(len(matches) - 1, -1, -1)
+        else:
+            pivot = bisect_left(matches, (boundary,))
+            if direction == "previous":
+                while pivot and matches[pivot - 1][1] > boundary:
+                    pivot -= 1
+                indices = chain(range(pivot - 1, -1, -1), range(len(matches) - 1, pivot - 1, -1))
+            else:
+                indices = chain(range(pivot, len(matches)), range(pivot))
+        for index in indices:
+            start, end = matches[index]
+            if not self.document().findBlock(start).isVisible():
+                continue
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(cursor)
+            self.ensureCursorVisible()
+            return True
+        return False
 
     def focusInEvent(self, event):
         super().focusInEvent(event)
