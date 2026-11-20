@@ -7,7 +7,7 @@
             "major": 0,
             "minor": 9,
             "patch": 0,
-            "build": 23,
+            "build": 25,
             "ctime": "",
             "mtime": "",
             "time": "13-15-32",
@@ -21,12 +21,12 @@
         }
     },
     "common/logger.py": {
-        "build": 23,
-        "hash": "df98d112e4decf9546812259ec2fdca12750af4edbfa7b363c81d793cbf0b74f",
+        "build": 24,
+        "hash": "371e2fc1d23403018eedb491d11d35d567ad682b158cf283764b1aeb3f9928ed",
         "has_changes": true,
         "ctime": "2026-10-28 10:15:27",
-        "mtime": "2026-10-28 13:07:49",
-        "version": "0.1.0.23",
+        "mtime": "2026-11-20 15:56:50",
+        "version": "0.1.0.24",
         "version_frozen": true
     },
     "core/app_state_manager.py": {
@@ -44,11 +44,11 @@
         "mtime": "2026-10-28 13:15:09"
     },
     "core/startup.py": {
-        "build": 23,
-        "hash": "e7d3ab39ee8aead1eadfbb5596b83515becb1880bd312f757b75930dca299514",
+        "build": 24,
+        "hash": "75292772ffa5af122df2dff04ed2232f847070642966f59de5587a99b0dab249",
         "has_changes": true,
         "ctime": "2026-10-28 10:18:53",
-        "mtime": "2026-10-31 10:12:14"
+        "mtime": "2026-11-20 14:47:29"
     },
     "core/runtime.py": {
         "build": 23,
@@ -58,18 +58,18 @@
         "mtime": "2026-10-28 12:12:29"
     },
     "core/config.py": {
-        "build": 23,
-        "hash": "272853c5a0205ee2d6bdf3acc6d6f00f5378c9cc3eb81ba11ad80268d5dfaedf",
+        "build": 24,
+        "hash": "b52fd1c9dc154e6f1ffe732f83db0815114037528545eb8eede8fef215873b19",
         "has_changes": true,
         "ctime": "2026-10-28 10:20:54",
-        "mtime": "2026-10-28 14:05:18"
+        "mtime": "2026-11-20 15:56:50"
     },
     "ui/wrappers/preferences_wrapper.py": {
-        "build": 23,
-        "hash": "858c22ddccb3ad5d3425145857146a7cf2911354f60d436bdcbda9673f887aba",
+        "build": 24,
+        "hash": "4e4d64f1ecd3d88c4db3077098e085f141c0385751cc889eadab366b9847616e",
         "has_changes": true,
         "ctime": "2026-10-28 11:42:47",
-        "mtime": "2026-10-28 12:58:51"
+        "mtime": "2026-11-20 15:58:46"
     },
     "core/messages.py": {
         "build": 23,
@@ -93,18 +93,18 @@
         "mtime": "2026-10-31 09:34:35"
     },
     "ui/log_view.py": {
-        "build": 23,
-        "hash": "838d0757e4029772cebb21f102d0b661b40ff32190e95e6bf529887614168dad",
+        "build": 25,
+        "hash": "1088469c4c0a4564a89390fcf1d4f4971011add6cd73cf1ee8eada00337c1270",
         "has_changes": true,
         "ctime": "2026-10-28 12:49:13",
-        "mtime": "2026-11-19 13:28:27"
+        "mtime": "2026-11-20 16:02:40"
     },
     "ui/startup_dialog.py": {
-        "build": 23,
-        "hash": "eadfb72294f53e7d16a3ab837e8cf677c2d3f95bd1bbb6fa3f78a16951fbcd51",
+        "build": 24,
+        "hash": "c91e987633797660a20f7c6b33d5789fb55280adc8755bba430c2eeb75e628a2",
         "has_changes": true,
         "ctime": "2026-10-28 12:50:33",
-        "mtime": "2026-10-28 12:55:15"
+        "mtime": "2026-11-20 14:47:29"
     },
     "ui/main_window.py": {
         "build": 23,
@@ -121,11 +121,11 @@
         "mtime": "2026-10-31 09:34:35"
     },
     "core/log_merge.py": {
-        "build": 23,
-        "hash": "03c8263a5252fccc4167fe37a4569e23ba12c24691b60c9f4fce1dbe7dacc2bf",
+        "build": 25,
+        "hash": "09acb371e89e429c79f9c3a1ad430319e6b258884cde8c7b041d8c070f4557bf",
         "has_changes": true,
         "ctime": "2026-10-31 09:34:35",
-        "mtime": "2026-10-31 09:34:35"
+        "mtime": "2026-11-20 16:02:40"
     },
     "log_server.py": {
         "build": 23,
@@ -147,5 +147,12 @@
         "has_changes": true,
         "ctime": "2026-11-19 14:00:07",
         "mtime": "2026-11-19 14:00:07"
+    },
+    "core/log_format.py": {
+        "build": 1,
+        "hash": "6ceadc4a45730c6a335c10684f4a565f6f941a0f7d0fb2b36ef0bcdecaf10ae9",
+        "has_changes": true,
+        "ctime": "2026-11-20 15:56:50",
+        "mtime": "2026-11-20 15:56:50"
     }
 }

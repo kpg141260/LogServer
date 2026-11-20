@@ -50,6 +50,10 @@ class LoggingSettings:
     max_bytes: int = 10485760
     backup_count: int = 5
     level: str = "info"
+    use_origin_timestamp: bool = True
+    use_local_timestamp: bool = False
+    add_device_ip: bool = True
+    add_device_protocol: bool = False
 
 
 @dataclass

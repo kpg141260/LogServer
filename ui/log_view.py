@@ -11,16 +11,13 @@ from PySide6.QtGui import QColor, QFont, QFontDatabase, QPainter, QPalette, QSyn
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
 from core.messages import LEVEL, parseMessage
+from core.log_format import DEVICE_HEADER, FORMATTED_HEADER, TIMESTAMP
 from ui.appearance import logColors
 from ui.log_search import SearchWorker
 
 
 HEADER = re.compile(r"^\d{4}-\d\d-\d\dT\S+ \[?(?P<ip>[^\s\]]+)\]? \[?(?P<protocol>TCP|UDP|APP)\]? \[?(?P<severity>[A-Z]+)\]? (?:- )?")
 DEVICE = re.compile(r"\|([^|\n]*)\|")
-TIMESTAMP = r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"
-DEVICE_HEADER = re.compile(
-    rf"{TIMESTAMP}[ \t]+"
-    rf"(?:\[[ \t]*{LEVEL.pattern}[ \t]*\]|{LEVEL.pattern})[ \t]*(?:[-:][ \t]*)?", re.IGNORECASE)
 IP_OCTET = r"(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)"
 PATH = (
     r'''(?<=["'])(?:[^"'\n]*[\\/][^"'\n]+|[^"'\n]*\.[A-Za-z][\w.-]*)(?=["'])'''
@@ -61,9 +58,9 @@ COLORS = {
 
 def logFields(text, previous=None):
     fields = dict.fromkeys(("severity", "ip", "protocol", "device"), "")
-    header = HEADER.match(text)
+    header = HEADER.match(text) or FORMATTED_HEADER.match(text)
     if header:
-        fields.update(header.groupdict())
+        fields.update({key: value or "" for key, value in header.groupdict().items()})
         device = DEVICE.match(text, header.end())
         fields["device"] = device[1] if device else ""
     elif text.startswith(("{", "<")):
@@ -101,7 +98,7 @@ class LogHighlighter(QSyntaxHighlighter):
 
         dark = self.view.palette().base().color().lightness() < 128
         colors = COLORS["dark" if dark else "light"]
-        header = HEADER.match(text) or FILE_HEADER.match(text)
+        header = HEADER.match(text) or FILE_HEADER.match(text) or FORMATTED_HEADER.match(text)
         levels = ("DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL", "ALERT", "EMERGENCY")
         data = self.currentBlock().userData()
         level = header["severity"] if header else data.fields["severity"] if data else ""

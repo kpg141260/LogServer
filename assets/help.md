@@ -58,6 +58,8 @@ The merge reads the full source files, orders records by timestamp, and preserve
 
 **File > Preferences...** controls appearance, fonts, display limits, listener settings and received-log files. The **Files** tab enables file logging and selects the folder, combined or per-client files, and rotation settings. Existing files are appended.
 
+The **Log Format** tab previews saved records as you toggle originator time (`[DTS]`), local reception time (`[LTS]`), device IP and protocol. Originator time and IP are enabled by default; local time and protocol are disabled. Both timestamps can be selected together. Severity appears once as `**SEVERITY** - message`. Missing originator timestamps are omitted. Changes apply at the next Start without rewriting existing files. Records without timestamps cannot be merged by timestamp.
+
 The left side of the status bar shows server state, TCP client count, received-message count and the colored application diagnostic level. This level controls internal diagnostics; received messages of every severity can still be displayed and saved. Internal diagnostics are recorded separately in `application.log` in the operating system's application data folder.
 
 Use **View > Line numbers** to toggle line numbers for the active pane. Search, filters and line numbers affect the display only.

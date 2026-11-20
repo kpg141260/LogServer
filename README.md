@@ -106,11 +106,13 @@ with socket.create_connection(("127.0.0.1", 5514), timeout=5) as client:
     client.sendall(b"INFO ^sensor-1^ temperature=24.5 C\n")
 ```
 
-The display colors severity, timestamps, IP addresses, paths, numeric values, comma-separated literal keywords configured in Preferences, and sections surrounded by `^`. Text and markers stay selectable. Incoming HTML is displayed literally; terminal escape sequences and control characters are removed. Invalid encoded bytes are replaced. Duplicate device timestamps and severity prefixes are removed from the live display when recognized; saved message content retains them. Display history is bounded independently of files, so clearing the display does not remove saved logs.
+The display colors severity, timestamps, IP addresses, paths, numeric values, comma-separated literal keywords configured in Preferences, and sections surrounded by `^`. Text and markers stay selectable. Incoming HTML is displayed literally; terminal escape sequences and control characters are removed. Invalid encoded bytes are replaced. Duplicate device timestamps and severity prefixes are removed from the live display when recognized. File output follows the Log Format preferences below. Display history is bounded independently of files, so clearing the display does not remove saved logs.
 
 ## Live views and pane controls
 
 The **All clients** tab combines incoming messages. Separate client tabs identify the transport, IP address and source port; TCP tabs also show **Connected** or **Disconnected**. Disconnecting or stopping reception preserves displayed messages. Close an individual client tab with its close button; further messages from that client can recreate it. **All clients** stays open.
+
+![LogServer main screen](docs/images/ls_20261120_135647.png)
 
 Use **View > Socket panel** and **View > File panel** to show or hide the panels. Hiding either panel preserves its contents and does not stop reception. Click a log pane or client tab to target its controls:
 
@@ -148,7 +150,16 @@ The output cannot overwrite either source file, including aliases to those files
 
 Preferences selects **One combined file** or **One file per client IP**, the folder, combined file name, and rotation size/backup count. Existing files are appended. Rotation removes the oldest retained backup when the configured count is exceeded. Disabling rotation allows files to grow without a size limit.
 
-Per-client file names use a stable hash of the socket IP address; every record includes the original IP, reception time with timezone, transport, and severity. Connections from the same IP share a file, including devices behind the same NAT. A device cannot supply a file path. File logging applies to every severity regardless of the application diagnostic level.
+Per-client file names use a stable hash of the socket IP address. Connections from the same IP share a file, including devices behind the same NAT. A device cannot supply a file path. File logging applies to every severity regardless of the application diagnostic level.
+
+**Preferences > Log Format** controls saved records and shows a live example as you toggle the options:
+
+- **Use originator's timestamp**: enabled by default; labels the peer timestamp `[DTS]` when a leading ISO-style timestamp is available.
+- **Use local timestamp**: disabled by default; adds LogServer's reception timestamp with timezone, labelled `[LTS]`. Both timestamps can be enabled together.
+- **Add Device IP**: enabled by default.
+- **Add Device Protocol**: disabled by default.
+
+The original leading severity is normalized once as `**SEVERITY** - message`. If it is absent, the parsed message severity is used. Missing peer timestamps are omitted. Changes apply after Stop and Start and affect future records; existing files are unchanged. File viewing supports both formats. Timestamp merging uses the first timestamp in each record and rejects records saved without a timestamp.
 
 `application.log` in the standard application data folder records internal diagnostics separately. Bind failures, oversized messages, client limits, idle disconnections, and file errors are shown in the window. File-write failure stops the receiver and reports the error. TCP messages over the configured limit close that client; oversized UDP datagrams are rejected. A bounded display queue applies backpressure to reception; UDP may lose datagrams under load. Stop finishes data already read by the receiver and flushes buffered partial TCP lines; clients should finish sending before Stop.
 

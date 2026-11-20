@@ -234,8 +234,9 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual([m.text for m in messages], ["INFO 温度 24°C", "ERROR ^sensor^ failed", "last line"])
         self.assertEqual(messages[1].level, "ERROR")
         stored = (Path(server.config.logging.directory) / "devices.log").read_text(encoding="utf-8")
-        for message in messages:
-            self.assertIn(message.text, stored)
+        self.assertEqual(stored.splitlines(), ["[127.0.0.1] **INFO** - 温度 24°C",
+                                               "[127.0.0.1] **ERROR** - ^sensor^ failed",
+                                               "[127.0.0.1] **INFO** - last line"])
 
     def test_udp_syslog_json_and_invalid_utf8(self):
         server = self.start(self.configured("udp"))
@@ -665,7 +666,7 @@ class ProjectTest(unittest.TestCase):
                 view.appendMessage(stamp + body)
                 self.assertEqual(view.toPlainText(), stamp + body)
 
-    def test_main_window_normalizes_device_header_only_in_display(self):
+    def test_main_window_normalizes_device_header_in_display_and_file(self):
         self.manager.config = self.configured()
         self.manager.config.general.auto_start = False
         window = MainWindow(ApplicationSetup(self.manager, self.paths))
@@ -680,7 +681,8 @@ class ProjectTest(unittest.TestCase):
         self.assertTrue(displayed.endswith("127.0.0.1 TCP [INFO] as_wifi_watchdog 536966416 has completed [41232 bytes free]"))
         self.assertNotIn("2026-10-29 04:52:39", displayed)
         stored = (Path(self.manager.config.logging.directory) / "devices.log").read_text()
-        self.assertIn("127.0.0.1 TCP [INFO] " + source, stored)
+        self.assertEqual(stored, "2026-10-29 04:52:39 [DTS] [127.0.0.1] **INFO** - "
+                         "as_wifi_watchdog 536966416 has completed [41232 bytes free]\n")
         window.close()
         pump_until(lambda: not window.isVisible())
 

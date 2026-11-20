@@ -11,6 +11,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from core.config import LoggingSettings
+from core.log_format import formatFileMessage
 from core.messages import LogMessage
 
 
@@ -60,7 +61,7 @@ class MessageFileWriter:
             # File identity follows the socket IP, never a device-provided name.
             identity = hashlib.sha256(message.client.encode("utf-8")).hexdigest()[:12]
             filename = f"client-{identity}.log"
-        record = logging.LogRecord("devices", logging.INFO, "", 0, message.line, (), None)
+        record = logging.LogRecord("devices", logging.INFO, "", 0, formatFileMessage(message, self.settings), (), None)
         self._handler(filename).emit(record)
 
     def close(self) -> None:

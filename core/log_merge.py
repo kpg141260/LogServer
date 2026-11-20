@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 
 from PySide6.QtCore import QIODevice, QSaveFile
 
+from core.log_format import FORMATTED_HEADER
+
 
 STAMP = re.compile(rb"^\[?(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)(?=\s|\]|$)")
 DATE_PREFIX = re.compile(rb"^\[?\d{4}-\d{2}-\d{2}")
@@ -56,7 +58,8 @@ def mergeLogFiles(paths, destination, interrupted=lambda: False):
                                 except (ValueError, OverflowError, OSError) as exc:
                                     raise ValueError(f"{path}, line {number}: invalid timestamp.") from exc
                                 count += 1
-                            elif DATE_PREFIX.match(raw) or stamp is None:
+                            elif (DATE_PREFIX.match(raw) or stamp is None or
+                                  FORMATTED_HEADER.match(raw.decode("utf-8", errors="replace"))):
                                 raise ValueError(f"{path}, line {number}: missing or unsupported timestamp.")
                             records.execute("INSERT INTO lines VALUES (?, ?)", (stamp, raw))
                 records.commit()

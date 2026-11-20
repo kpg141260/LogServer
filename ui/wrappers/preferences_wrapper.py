@@ -4,14 +4,17 @@ __VERSION__ = "0.1.0.7"
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog,
     QFontDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QSpinBox, QStyleFactory, QTabWidget, QVBoxLayout, QWidget,
+    QPlainTextEdit, QPushButton, QSpinBox, QStyleFactory, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from core.config import ConfigManager
+from core.log_format import formatFileMessage
+from core.messages import LogMessage
 
 
 class PreferencesDialog(QDialog):
@@ -27,6 +30,7 @@ class PreferencesDialog(QDialog):
         self._appearance()
         self._socket()
         self._logging()
+        self._logFormat()
         note = QLabel("Socket and file changes apply when the server is next started. Display changes apply immediately.")
         note.setWordWrap(True)
         root.addWidget(note)
@@ -160,6 +164,39 @@ class PreferencesDialog(QDialog):
         note = QLabel("All received severities are saved. Existing files are appended. Rotation retains the configured number of backups. Devices sharing an IP share a client log.")
         note.setWordWrap(True)
         form.addRow(note)
+
+    def _logFormat(self):
+        form = self._tab("Log Format")
+        for name, label in (("use_origin_timestamp", "Use originator's timestamp"),
+                            ("use_local_timestamp", "Use local timestamp"),
+                            ("add_device_ip", "Add Device IP"),
+                            ("add_device_protocol", "Add Device Protocol")):
+            box = self._check(getattr(self.draft.logging, name))
+            box.setAccessibleName(label)
+            setattr(self, name, box)
+            form.addRow(label, box)
+            box.toggled.connect(self._updateFormatPreview)
+        source = "2026-10-29 05:35:29 [ critical] Core 1 UART stack allocation failed; reset required [44192 bytes free]"
+        self.format_example = LogMessage("2026-10-29T11:35:29.139+08:00", "10.10.0.146", 0,
+                                         "tcp", "CRITICAL", "", source, source)
+        original = QLabel(source)
+        original.setTextFormat(Qt.TextFormat.PlainText)
+        original.setWordWrap(True)
+        form.addRow("Received message", original)
+        self.format_preview = QPlainTextEdit()
+        self.format_preview.setReadOnly(True)
+        self.format_preview.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
+        self.format_preview.setAccessibleName("Saved log message preview")
+        form.addRow("Saved message", self.format_preview)
+        note = QLabel("DTS is the originator's time; LTS is LogServer's reception time. Missing originator timestamps are omitted. These options affect saved files after the next Start.")
+        note.setWordWrap(True)
+        form.addRow(note)
+        self._updateFormatPreview()
+
+    def _updateFormatPreview(self):
+        for name in ("use_origin_timestamp", "use_local_timestamp", "add_device_ip", "add_device_protocol"):
+            setattr(self.draft.logging, name, getattr(self, name).isChecked())
+        self.format_preview.setPlainText(formatFileMessage(self.format_example, self.draft.logging))
 
     def _browse(self):
         folder = QFileDialog.getExistingDirectory(self, "Received log folder", self.directory.text())
