@@ -78,91 +78,96 @@
      fill="url(#background)"
      id="rect4"
      style="fill:url(#background);stroke-width:1.10203" />
-  <rect
-     x="192"
-     y="112"
-     width="232"
-     height="304"
-     rx="32"
-     fill="#091522"
-     opacity=".3"
-     id="rect5" />
-  <rect
-     x="192"
-     y="104"
-     width="232"
-     height="304"
-     rx="32"
-     fill="url(#panel)"
-     stroke="#638097"
-     stroke-width="4"
-     id="rect6" />
-  <path
-     d="M232 168h144M232 224h144M232 280h144M232 336h144"
-     fill="none"
-     stroke="#e9f2f8"
-     stroke-width="16"
-     stroke-linecap="round"
-     id="path6" />
-  <path
-     d="M232 168h2"
-     stroke="#5ee0c0"
-     stroke-width="16"
-     stroke-linecap="round"
-     id="path7" />
-  <path
-     d="M232 224h2"
-     stroke="#6cc8f5"
-     stroke-width="16"
-     stroke-linecap="round"
-     id="path8" />
-  <path
-     d="M232 280h2"
-     stroke="#ffc365"
-     stroke-width="16"
-     stroke-linecap="round"
-     id="path9" />
-  <path
-     d="M232 336h2"
-     stroke="#ff8585"
-     stroke-width="16"
-     stroke-linecap="round"
-     id="path10" />
-  <path
-     d="M96 168h24a20 20 0 0 1 20 20v136a20 20 0 0 1-20 20H96M96 256h116"
-     fill="none"
-     stroke="#5ee0c0"
-     stroke-width="16"
-     stroke-linecap="round"
-     stroke-linejoin="round"
-     id="path11" />
-  <path
-     d="m196 236 20 20-20 20"
-     fill="none"
-     stroke="#5ee0c0"
-     stroke-width="16"
-     stroke-linecap="round"
-     stroke-linejoin="round"
-     id="path12" />
   <g
-     fill="#14283b"
-     stroke="#5ee0c0"
-     stroke-width="10"
-     id="g14">
-    <circle
-       cx="80"
-       cy="168"
-       r="18"
-       id="circle12" />
-    <circle
-       cx="80"
-       cy="256"
-       r="18"
-       id="circle13" />
-    <circle
-       cx="80"
-       cy="344"
-       r="18"
-       id="circle14" />
+     id="g1"
+     transform="matrix(1.2,0,0,1.2,-36.663636,-52.328926)">
+    <rect
+       x="192"
+       y="112"
+       width="232"
+       height="304"
+       rx="32"
+       fill="#091522"
+       opacity="0.3"
+       id="rect5" />
+    <rect
+       x="192"
+       y="104"
+       width="232"
+       height="304"
+       rx="32"
+       fill="url(#panel)"
+       stroke="#638097"
+       stroke-width="4"
+       id="rect6"
+       style="fill:url(#panel)" />
+    <path
+       d="M 232,168 H 376 M 232,224 H 376 M 232,280 H 376 M 232,336 H 376"
+       fill="none"
+       stroke="#e9f2f8"
+       stroke-width="16"
+       stroke-linecap="round"
+       id="path6" />
+    <path
+       d="m 232,168 h 2"
+       stroke="#5ee0c0"
+       stroke-width="16"
+       stroke-linecap="round"
+       id="path7" />
+    <path
+       d="m 232,224 h 2"
+       stroke="#6cc8f5"
+       stroke-width="16"
+       stroke-linecap="round"
+       id="path8" />
+    <path
+       d="m 232,280 h 2"
+       stroke="#ffc365"
+       stroke-width="16"
+       stroke-linecap="round"
+       id="path9" />
+    <path
+       d="m 232,336 h 2"
+       stroke="#ff8585"
+       stroke-width="16"
+       stroke-linecap="round"
+       id="path10" />
+    <path
+       d="m 96,168 h 24 a 20,20 0 0 1 20,20 v 136 a 20,20 0 0 1 -20,20 H 96 m 0,-88 h 116"
+       fill="none"
+       stroke="#5ee0c0"
+       stroke-width="16"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="path11" />
+    <path
+       d="m 196,236 20,20 -20,20"
+       fill="none"
+       stroke="#5ee0c0"
+       stroke-width="16"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="path12" />
+    <g
+       fill="#14283b"
+       stroke="#5ee0c0"
+       stroke-width="10"
+       id="g14">
+      <circle
+         cx="80"
+         cy="168"
+         r="18"
+         id="circle12" />
+      <circle
+         cx="80"
+         cy="256"
+         r="18"
+         id="circle13" />
+      <circle
+         cx="80"
+         cy="344"
+         r="18"
+         id="circle14" />
+    </g>
   </g>
 </svg>

@@ -2,8 +2,8 @@
 Type=Application
 Name=LogServer
 Comment=Receive and view TCP and UDP device logs
-Exec="/home/peterg/Development/Python/LogServer/.venv/bin/python" "/home/peterg/Development/Python/LogServer/log_server.py"
-Icon=/home/peterg/Development/Python/LogServer/assets/logserver.svg
+Exec="$HOME/Development/Python/LogServer/.venv/bin/python" "$HOME/Development/Python/LogServer/log_server.py"
+Icon=$HOME/Development/Python/LogServer/assets/logserver.svg
 Terminal=false
 Categories=Development;
 StartupNotify=true

@@ -1,9 +1,0 @@
-[project]
-name = "LogServer"
-version = "0.1.0"
-description = "Cross-platform socket log receiver with a PySide6 desktop interface"
-requires-python = ">=3.11"
-dependencies = ["PySide6==6.12.0"]
-
-[tool.pyside6-project]
-files = ["log_server.py"]
