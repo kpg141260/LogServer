@@ -1,11 +1,12 @@
 __VERSION__ = "0.1.0.2"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 from pathlib import Path
+import sys
 
 from PySide6.QtCore import Qt
 
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
+    QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QVBoxLayout,
 )
 
@@ -45,6 +46,9 @@ class StartupDialog(QDialog):
         preferences = QPushButton("Socket and other preferences...")
         preferences.clicked.connect(self._preferences)
         root.addWidget(preferences)
+        self.launcher = QCheckBox("Create Applications menu launcher")
+        self.launcher.setVisible(sys.platform.startswith("linux"))
+        root.addWidget(self.launcher)
         self.error = QLabel(setupReason(paths))
         self.error.setWordWrap(True)
         root.addWidget(self.error)
@@ -84,7 +88,8 @@ class StartupDialog(QDialog):
         value = self.directory.text().strip()
         self.manager.config.logging.directory = str(Path(value).expanduser().resolve()) if value else ""
         try:
-            completeSetup(self.paths, self.manager)
+            completeSetup(self.paths, self.manager,
+                          create_launcher=sys.platform.startswith("linux") and self.launcher.isChecked())
         except (OSError, ValueError, TypeError, RuntimeError) as exc:
             self.error.setText(f"Setup could not finish: {exc}")
             return

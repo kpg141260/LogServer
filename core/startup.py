@@ -3,12 +3,13 @@ from __future__ import annotations
 __VERSION__ = "0.1.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QFileDevice, QIODevice, QSaveFile, QStandardPaths
 
 from core.app_state_manager import AppStateManager
 from core.config import ConfigManager
@@ -62,13 +63,68 @@ def firstLaunch(paths: StartupPaths) -> bool:
     return bool(setupReason(paths))
 
 
-def completeSetup(paths: StartupPaths, manager: ConfigManager) -> None:
+def installDesktopLauncher() -> Path:
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("Applications menu launchers are only supported on Linux.")
+    data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    if not data_home.is_absolute():
+        raise ValueError("XDG_DATA_HOME must be an absolute path.")
+    root = Path(__file__).resolve().parents[1]
+    executable = Path(sys.executable).absolute()
+    command = [executable]
+    if not getattr(sys, "frozen", False):
+        command.append(root / "log_server.py")
+    icon = root / "assets" / "logserver.svg"
+    for path in (*command, icon):
+        if not path.is_file():
+            raise OSError(f"Launcher file is unavailable: {path}")
+        if any(ord(char) < 32 or ord(char) == 127 for char in str(path)):
+            raise ValueError("Launcher paths cannot contain control characters.")
+    if any(char in str(executable) for char in "=%"):
+        raise ValueError("The launcher executable path cannot contain '=' or '%'.")
+
+    def quote(path):
+        value = str(path).replace("%", "%%")
+        value = "".join("\\" + char if char in '\\"`$' else char for char in value)
+        return '"' + value + '"'
+
+    # Desktop-entry string escaping is applied before Exec argument quoting.
+    command_line = " ".join(quote(path) for path in command).replace("\\", "\\\\")
+    icon_path = str(icon).replace("\\", "\\\\")
+    data = ("[Desktop Entry]\nType=Application\nName=LogServer\n"
+            "Comment=Receive and view TCP and UDP device logs\n"
+            f"Exec={command_line}\nIcon={icon_path}\n"
+            "Terminal=false\nCategories=Utility;\nStartupNotify=true\n"
+            "StartupWMClass=LogServer\n").encode("utf-8")
+    destination = data_home / "applications" / "logserver.desktop"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    output = QSaveFile(str(destination))
+    try:
+        if not output.open(QIODevice.OpenModeFlag.WriteOnly):
+            raise OSError(output.errorString())
+        permissions = QFileDevice.Permission
+        if not output.setPermissions(permissions.ReadOwner | permissions.WriteOwner |
+                                     permissions.ReadGroup | permissions.ReadOther):
+            raise OSError(output.errorString())
+        if output.write(data) != len(data):
+            raise OSError(output.errorString())
+        if not output.commit():
+            raise OSError(output.errorString())
+    finally:
+        if output.isOpen():
+            output.cancelWriting()
+    return destination
+
+
+def completeSetup(paths: StartupPaths, manager: ConfigManager, *, create_launcher: bool = False) -> None:
     manager.validate(manager.config)
     if manager.config.logging.enabled:
         Path(manager.config.logging.directory).expanduser().mkdir(parents=True, exist_ok=True)
     state = AppStateManager(str(paths.state_file))
     state.saveSetup(False)
     manager.commit(manager.createDraft())
+    if create_launcher:
+        installDesktopLauncher()
     state.saveSetup(True)
 
 
